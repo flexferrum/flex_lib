@@ -1,0 +1,33 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "sources", "sources", "{665C1A12-9EF9-40AB-86B8-BC47009B1F03}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{ED2BFD7B-DBF5-44B4-8F82-42A22B89FD03}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lazy_list", "tests\lazy_list\lazy_list.vcxproj", "{A717A569-C146-4DD0-BA38-575A79343F09}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "headers", "headers", "{357322CE-CF9E-4BC3-BA27-F532D549DCE1}"
+	ProjectSection(SolutionItems) = preProject
+		flex_lib\lazy_list.h = flex_lib\lazy_list.h
+		flex_lib\lazy_list.inl.h = flex_lib\lazy_list.inl.h
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A717A569-C146-4DD0-BA38-575A79343F09}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A717A569-C146-4DD0-BA38-575A79343F09}.Debug|Win32.Build.0 = Debug|Win32
+		{A717A569-C146-4DD0-BA38-575A79343F09}.Release|Win32.ActiveCfg = Release|Win32
+		{A717A569-C146-4DD0-BA38-575A79343F09}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{A717A569-C146-4DD0-BA38-575A79343F09} = {ED2BFD7B-DBF5-44B4-8F82-42A22B89FD03}
+	EndGlobalSection
+EndGlobal
