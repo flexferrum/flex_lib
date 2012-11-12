@@ -70,11 +70,14 @@ namespace flex_lib
 		typedef NT* pointer_type;
 		typedef NT const* const_pointer_type;
 		typedef lazy_list_node<NT> node_type_t;
-		typedef std::list<node_type_t, A<node_type_t>> inner_list_t;
+		typedef std::list<node_type_t, A<node_type_t> > inner_list_t;
 		typedef lazy_list_iterator<this_type> const_iterator;
 		typedef const_iterator iterator;
 
-		lazy_list() {;}
+		lazy_list() 
+		{
+			InitList([](bool& isEOS) -> NodeEvaluator {isEOS = true; return NodeEvaluator();});
+		}
 
 	#if 0
 		template<typename VT>
@@ -197,11 +200,16 @@ namespace flex_lib
 
 			NodeIniter range_initer; //  = MakeRangeIniter(begin(), end());
 			this_type source_list(*this);
-			return ret_type([range_initer, fn, source_list, is_first_time, this](bool& isEOS) mutable -> node_evtor_t
+            this_type* this_list;
+            return ret_type([this_list, range_initer, fn, source_list, is_first_time](bool& isEOS) mutable -> node_evtor_t
 			{
 				if (is_first_time)
 				{
+#ifdef _MSC_VER
 					range_initer = MakeRangeIniter(source_list.begin(), source_list.end());
+#else
+                    range_initer = this_list->MakeRangeIniter(source_list.begin(), source_list.end());
+#endif
 					is_first_time = false;
 				}
 				auto src_fn = range_initer(isEOS);
@@ -355,8 +363,8 @@ namespace flex_lib
 		typedef typename inner_iterator::difference_type	difference_type;
 		typedef std::forward_iterator_tag    				iterator_category;
 		typedef typename LL::value_type             		value_type;
-		typedef value_type const*                           pointer;
-		typedef value_type const&                           reference;
+		typedef typename LL::value_type const*              pointer;
+		typedef typename LL::value_type const&              reference;
 
 		lazy_list_iterator(LL const& list) : iterating_list(&list), is_end(true) {;}
 		lazy_list_iterator(LL const& list, inner_iterator it) : iterating_list(&list), current(it), is_end(false) {;}

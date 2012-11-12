@@ -15,6 +15,11 @@
 
 namespace flex_lib
 {
+class bad_enum_name : public std::logic_error
+{
+public:
+    bad_enum_name(std::string const& name) : std::logic_error(name)  {}
+};
 namespace detail
 {
 	template<typename S, typename E>
@@ -23,7 +28,7 @@ namespace detail
 		auto p = map.find(str);
 
 		if (p == map.end())
-			throw std::bad_cast();
+            throw bad_enum_name(str);
 
 		return p->second;
 	}
@@ -92,6 +97,6 @@ namespace detail
 
 #define FL_ENUM_ENTRY(EnumEntry) ((EnumEntry, BOOST_PP_EMPTY(), #EnumEntry))
 #define FL_ENUM_NAMED_ENTRY(EnumEntry, EnumEntryName) ((EnumEntry, BOOST_PP_EMPTY(), EnumEntryName))
-#define FL_ENUM_SPEC_ENTRY(EnumEntry, Id) ((EnumEntry, = ## Id, #EnumEntry))
+#define FL_ENUM_SPEC_ENTRY(EnumEntry, Id) ((EnumEntry, = Id, #EnumEntry))
 
 #endif // FLEX_LIB_STRINGIZED_ENUM_H__
