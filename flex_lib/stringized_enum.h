@@ -10,6 +10,7 @@
 #include <boost/preprocessor/stringize.hpp>
 
 #include <map>
+#include <unordered_map>
 #include <string>
 #include <stdexcept>
 
@@ -24,6 +25,17 @@ namespace detail
 {
 	template<typename S, typename E>
 	E FindEnumEntryForString(std::map<S, E> const& map, typename std::map<S, E>::key_type str)
+	{
+		auto p = map.find(str);
+
+		if (p == map.end())
+            throw bad_enum_name(str);
+
+		return p->second;
+	}
+    
+    template<typename S, typename E>
+	E FindEnumEntryForString(std::unordered_map<S, E> const& map, typename std::unordered_map<S, E>::key_type str)
 	{
 		auto p = map.find(str);
 
