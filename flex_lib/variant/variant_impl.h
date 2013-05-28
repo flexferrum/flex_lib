@@ -122,8 +122,10 @@ union InnerUnion<I>
     }
 };
 
-template<typename ... Types>
-struct VariantDataManipulator;
+enum
+{
+    EmptyVariant = -1
+};
 
 template<typename ... Types>
 struct VariantTypesEnumerator;
@@ -140,27 +142,29 @@ public:
         ;
     }
     
-    VariantDataHolder(const this_type &other, int dataType)
-        : m_Data()
+    VariantDataHolder(const this_type &other)
+        : m_DataType(EmptyVariant)
+        , m_Data()
     {
-        VariantDataManipulator<Types ...>::CopyData(other.m_Data, dataType, m_Data);
+        CopyData(other, other.m_DataType);
     }
     
-    VariantDataHolder(this_type &&other, int dataType)
-        : m_Data()
+    VariantDataHolder(this_type &&other)
+        : m_DataType(EmptyVariant)
+        , m_Data()
     {
-        VariantDataManipulator<Types ...>::MoveData(other.m_Data, dataType, m_Data);
+        MoveData(other, other.m_DataType);
     }
     
     template<typename U>
-    VariantDataHolder(const U& data, int &dataType)
+    VariantDataHolder(const U& data)
         : m_Data()
     {
         constexpr int type = VariantTypesEnumerator<Types ...>::template MatchType<U>::value;
-        dataType = type;
-        if (dataType == -1)
+        m_DataType = type;
+        if (m_DataType == -1)
             return;        
-        VariantDataManipulator<Types ...>::template InitializeDataCopy<type>(data, m_Data);
+        InitializeDataCopy<type>(data);
     }
     
     template<typename U>
@@ -168,66 +172,67 @@ public:
         : m_Data()
     {
         constexpr int type = VariantTypesEnumerator<Types ...>::template MatchType<U>::value;
-        dataType = type;
-        if (dataType == -1)
+        m_DataType = type;
+        if (m_DataType == -1)
             return;
-        VariantDataManipulator<Types ...>::template InitializeDataMove<type>(data, m_Data);
+        InitializeDataMove<type>(data);
     }            
     
-    void DestroyData(int dataType)
+    void DestroyData()
     {
-        VariantDataManipulator<Types ...>::DestroyData(m_Data, dataType);
+        if (m_DataType != EmptyVariant)
+            m_Data.Destroy(m_DataType);
     }
     
-    void Swap(int dataType, this_type &other, int otherDataType)
+    void Swap(this_type &other)
     {
-        if (dataType == otherDataType)
+        if (m_DataType == other.m_DataType)
         {
-            if (dataType == -1)
+            if (m_DataType == -1)
                 return;
             
-            VariantDataManipulator<Types ...>::SwapData(other.m_Data, dataType, m_Data);
+            SwapData(other, m_DataType);
             return;
         }
 
-        if (dataType == -1)
-            VariantDataManipulator<Types ...>::MoveData(other.m_Data, otherDataType, m_Data);
-        else if (otherDataType == -1)
-            VariantDataManipulator<Types ...>::MoveData(m_Data, dataType, other.m_Data);
+        if (m_DataType == -1)
+            MoveData(other, other.m_DataType);
+        else if (other.m_DataType == -1)
+            other.MoveData(*this, m_DataType);
         else
         {
             this_type tmp;
-            VariantDataManipulator<Types ...>::MoveData(other.m_Data, otherDataType, tmp.m_Data);
-            VariantDataManipulator<Types ...>::MoveData(m_Data, dataType, other.m_Data);
-            VariantDataManipulator<Types ...>::MoveData(tmp.m_Data, otherDataType, m_Data);
+            tmp.MoveData(other, other.m_DataType);
+            other.MoveData(*this, m_DataType);
+            MoveData(tmp, tmp.m_DataType);
         }
     }
     
     template<typename R>
-    R GetValue(int dataType) const
+    R GetValue() const
     {
         typedef typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type result;
         
-        return *GetPointer<result>(dataType);
+        return *GetPointer<result>();
     }
     
     template<typename R>
-    auto GetPointer(int dataType) const -> const typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type *
+    auto GetPointer() const -> const typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type *
     {
         typedef typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type result;
         constexpr int type = VariantTypesEnumerator<Types ...>::template MatchType<result>::value;
-        if (type != dataType)
+        if (type != m_DataType)
             return nullptr;        
         
         return reinterpret_cast<const result *>(&m_Data);
     }
     
     template<typename R>
-    auto GetPointer(int dataType) -> typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type *
+    auto GetPointer() -> typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type *
     {
         typedef typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type result;
         constexpr int type = VariantTypesEnumerator<Types ...>::template MatchType<result>::value;
-        if (type != dataType)
+        if (type != m_DataType)
             return nullptr;        
         
         return reinterpret_cast<result *>(&m_Data);
@@ -238,49 +243,48 @@ public:
         return &m_Data;
     }
     
+    int GetDataType() const
+    {
+        return m_DataType;
+    }
+    
 private:
+    void CopyData(const this_type &from, int dataType)
+    {
+        if (dataType != EmptyVariant)
+            m_Data.CopyFrom(from.m_Data, dataType);
+        m_DataType = dataType;
+    }
+    
+    void MoveData(this_type &from, int dataType)
+    {
+        if (dataType != EmptyVariant)
+            m_Data.MoveFrom(from.m_Data, dataType);
+        m_DataType = dataType;
+    }
+    
+    void SwapData(this_type &from, int dataType)
+    {
+        if (dataType != EmptyVariant)
+            m_Data.SwapWith(from.m_Data, dataType);
+        m_DataType = dataType;
+    }
+    
+    template<int I, typename U>
+    void InitializeDataCopy(const U &data)
+    {
+        m_Data.template InitWithCopy<I>(data);
+    }
+    
+    template<int I, typename U>
+    void InitializeDataMove(U &&data)
+    {
+        m_Data.template InitWithMove<I>(data);
+    }
+      
+private:
+    int m_DataType;
     InnerUnion<0, Types...> m_Data;
-};
-
-template<typename ... Types>
-struct VariantDataManipulator
-{
-    typedef InnerUnion<0, Types ...> Holder;
-    
-    static void CopyData(const Holder &from, int dataType, Holder &to)
-    {
-        if (dataType != -1)
-            to.CopyFrom(from, dataType);
-    }
-    
-    static void MoveData(Holder &from, int dataType, Holder &to)
-    {
-        if (dataType != -1)
-            to.MoveFrom(from, dataType);
-    }
-    
-    static void SwapData(Holder &from, int dataType, Holder &to)
-    {
-        if (dataType != -1)
-            to.SwapWith(from, dataType);
-    }
-    
-    template<int I, typename U>
-    static void InitializeDataCopy(const U &data, Holder &to)
-    {
-        to.template InitWithCopy<I>(data);
-    }
-    
-    template<int I, typename U>
-    static void InitializeDataMove(U &&data, Holder &to)
-    {
-        to.template InitWithMove<I>(data);
-    }
-    
-    static void DestroyData(Holder &data, int dataType)
-    {
-        data.Destroy(dataType);
-    }
 };
 
 template<typename ... Types>
@@ -367,43 +371,36 @@ public:
     };
     
     Variant()
-        : m_DataType(Empty)
     {
         ;
     }
     
     Variant(const this_type &other)
-        : m_DataType(other.m_DataType)
-        , m_Data(other.m_Data, m_DataType)
+        : m_Data(other.m_Data)
     {
         ;
     }
     
     Variant(this_type &&other)
-        : m_DataType(other.m_DataType)
-        , m_Data(std::move(other.m_Data), m_DataType)
+        : m_Data(std::move(other.m_Data))
     {
-        other.m_DataType = Empty;
     }
        
     template<typename T>
     Variant(const T& other)
-        : m_DataType(Empty)
-        , m_Data(other, m_DataType)
+        : m_Data(other)
     {
         
     }
     
     ~Variant()
     {
-        if (m_DataType != Empty)
-            m_Data.DestroyData(m_DataType);
+        m_Data.DestroyData();
     }
     
     void swap(this_type &other)
     {
-        m_Data.Swap(m_DataType, other.m_Data, other.m_DataType);
-        std::swap(m_DataType, other.m_DataType);
+        m_Data.Swap(other.m_Data);
     }
     
     this_type& operator = (const this_type &other)
@@ -420,14 +417,22 @@ public:
         return *this;
     }
     
+    template<typename U>
+    this_type& operator = (const U& val)
+    {
+        this_type temp(val);
+        swap(temp);
+        return *this;
+    }
+    
     bool IsEmpty() const
     {
-        return m_DataType == Empty;
+        return m_Data.GetDataType() == detail::EmptyVariant;
     }
     
     int Which() const 
     {
-        return m_DataType;        
+        return m_Data.GetDataType();        
     }
     
 #if FL_VARIANT_WITH_TEST == 1
@@ -439,7 +444,6 @@ public:
 #endif
     
 private:    
-    int m_DataType;
     detail::VariantDataHolder<Types...> m_Data;
     
 private:    
@@ -456,19 +460,19 @@ private:
 template<typename R, typename ... T>
 R get(const Variant<T...>& var)
 {
-    return var.m_Data.template GetValue<R>(var.m_DataType);
+    return var.m_Data.template GetValue<R>();
 }
 
 template<typename R, typename ... T>
 const R* get(const Variant<T...>* var)
 {
-    return var->m_Data.template GetPointer<R>(var->m_DataType);
+    return var->m_Data.template GetPointer<R>();
 }
 
 template<typename R, typename ... T>
 R* get(Variant<T...>* var)
 {
-    return var->m_Data.template GetPointer<R>(var->m_DataType);
+    return var->m_Data.template GetPointer<R>();
 }
 
 }

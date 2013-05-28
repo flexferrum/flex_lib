@@ -2,9 +2,6 @@
 #include <gtest/gtest-all.cc>
 
 #include <string>
-#include <functional>
-#include <list>
-#inlcude <vector>
 
 #define FL_VARIANT_WITH_TEST 1
 
@@ -301,7 +298,7 @@ TEST(Variant, ValueGetter)
         
         auto val_ptr = flex_lib::get<int>(&v1);
         EXPECT_TRUE((std::is_same<decltype(val_ptr), int*>::value));
-        EXPECT_NE(nullptr, val_ptr);
+        EXPECT_NE((int*)nullptr, val_ptr);
         EXPECT_EQ(10, *val_ptr);
         *val_ptr = 20;
         EXPECT_EQ(20, flex_lib::get<int>(v1));
@@ -342,6 +339,39 @@ TEST(Variant, ValueGetter)
         EXPECT_EQ(4, v.Which());
         EXPECT_EQ(&val, flex_lib::get<int*>(v));
     }
+}
+
+TEST(Variant, ValueAssignment)
+{
+    typedef flex_lib::Variant<int, double, char, std::string> Variant;
+    
+    Variant v;
+    v = 10;
+    
+    EXPECT_FALSE(v.IsEmpty());
+    EXPECT_EQ(0, v.Which());
+    EXPECT_EQ(10, *(int*)v.GetDataPointer());
+    
+    v = 20.0;
+    EXPECT_FALSE(v.IsEmpty());
+    EXPECT_EQ(1, v.Which());
+    EXPECT_EQ(20.0, *(double*)v.GetDataPointer());
+
+    v = '0';
+    EXPECT_FALSE(v.IsEmpty());
+    EXPECT_EQ(2, v.Which());
+    EXPECT_EQ('0', *(char*)v.GetDataPointer());
+    
+    v = "abcd";
+    EXPECT_FALSE(v.IsEmpty());
+    EXPECT_EQ(3, v.Which());
+    EXPECT_EQ(std::string("abcd"), *(std::string*)v.GetDataPointer());
+
+    std::string str("bcde");
+    v = str;
+    EXPECT_FALSE(v.IsEmpty());
+    EXPECT_EQ(3, v.Which());
+    EXPECT_EQ(str, *(std::string*)v.GetDataPointer());
 }
 
 int main(int argc, char* argv[])
