@@ -2,6 +2,9 @@
 #include <gtest/gtest-all.cc>
 
 #include <string>
+#include <functional>
+#include <list>
+#inlcude <vector>
 
 #define FL_VARIANT_WITH_TEST 1
 
@@ -281,50 +284,65 @@ TEST(Variant, MoveAssignment)
 
 TEST(Variant, ValueGetter)
 {
-    typedef flex_lib::Variant<int, double, char, std::string> Variant;
+    typedef flex_lib::Variant<int, double, char, std::string, int *> Variant;
     
     {
-        Variant v(10);
-        EXPECT_FALSE(v.IsEmpty());
-        EXPECT_EQ(0, v.Which());
+        Variant v1(10);
+        EXPECT_FALSE(v1.IsEmpty());
+        EXPECT_EQ(0, v1.Which());
 
-        auto val = flex_lib::get<int>(v);
-        EXPECT_TRUE(std::is_same(decltype(val), int));
+        auto val = flex_lib::get<int>(v1);
+        EXPECT_TRUE((std::is_same<decltype(val), int>::value));
         EXPECT_EQ(10, val);
+        
+        auto val2 = flex_lib::get<short>(v1);
+        EXPECT_TRUE((std::is_same<decltype(val2), short>::value));
+        EXPECT_EQ(10, val2);
+        
+        auto val_ptr = flex_lib::get<int>(&v1);
+        EXPECT_TRUE((std::is_same<decltype(val_ptr), int*>::value));
+        EXPECT_NE(nullptr, val_ptr);
+        EXPECT_EQ(10, *val_ptr);
+        *val_ptr = 20;
+        EXPECT_EQ(20, flex_lib::get<int>(v1));
+        
+        auto val_ptr1 = flex_lib::get<double>(&v1);
+        EXPECT_EQ(nullptr, val_ptr1);
     }
     
-    /*
     {
         Variant v(20.0);
         EXPECT_FALSE(v.IsEmpty());
         EXPECT_EQ(1, v.Which());
-        EXPECT_EQ(20.0, *(double*)v.GetDataPointer());
+        EXPECT_EQ(20.0, flex_lib::get<double>(v));
     }
     
     {
         Variant v('0');
         EXPECT_FALSE(v.IsEmpty());
         EXPECT_EQ(2, v.Which());
-        EXPECT_EQ('0', *(char*)v.GetDataPointer());
+        EXPECT_EQ('0', flex_lib::get<char>(v));
     }
     
     {
         Variant v("abcd");
         EXPECT_FALSE(v.IsEmpty());
         EXPECT_EQ(3, v.Which());
-        EXPECT_EQ(std::string("abcd"), *(std::string*)v.GetDataPointer());
+        EXPECT_EQ(std::string("abcd"), flex_lib::get<std::string>(v));
+        
+        auto &str1 = flex_lib::get<const std::string&>(v);
+        auto str2 = flex_lib::get<std::string>(&v);
+        EXPECT_EQ(&str1, str2);
     }
     
     {
-        std::string str("bcde");
-        Variant v(const_cast<const std::string&>(str));
+        int val = 30;
+        Variant v(&val);
         EXPECT_FALSE(v.IsEmpty());
-        EXPECT_EQ(3, v.Which());
-        EXPECT_EQ(str, *(std::string*)v.GetDataPointer());
+        EXPECT_EQ(4, v.Which());
+        EXPECT_EQ(&val, flex_lib::get<int*>(v));
     }
-    */
 }
-
 
 int main(int argc, char* argv[])
 {

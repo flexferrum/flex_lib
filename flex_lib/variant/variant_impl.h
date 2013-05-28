@@ -204,25 +204,36 @@ public:
     }
     
     template<typename R>
-    auto GetValue(const this_type &v, int dataType) const -> const typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type &
+    R GetValue(int dataType) const
     {
         typedef typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type result;
         
-        return *GetPointer<result>(v);
+        return *GetPointer<result>(dataType);
     }
     
     template<typename R>
-    auto GetPointer(const this_type &v, int dataType) const -> const typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type *
+    auto GetPointer(int dataType) const -> const typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type *
     {
         typedef typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type result;
-        constexpr int type = VariantTypesEnumerator<Types ...>::template MatchType<R>::value;
+        constexpr int type = VariantTypesEnumerator<Types ...>::template MatchType<result>::value;
         if (type != dataType)
             return nullptr;        
         
         return reinterpret_cast<const result *>(&m_Data);
     }
     
-    void * GetDataPointer()
+    template<typename R>
+    auto GetPointer(int dataType) -> typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type *
+    {
+        typedef typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type result;
+        constexpr int type = VariantTypesEnumerator<Types ...>::template MatchType<result>::value;
+        if (type != dataType)
+            return nullptr;        
+        
+        return reinterpret_cast<result *>(&m_Data);
+    }
+    
+    void * GetRawDataPointer()
     {
         return &m_Data;
     }
@@ -305,7 +316,13 @@ struct VariantTypesEnumerator
             return IndexMatcher<0, Types ...>::GetExactMatchedIndex() != -1 ? IndexMatcher<0, Types ...>::GetExactMatchedIndex() : IndexMatcher<0, Types ...>::GetMatchedIndex();
         }
         
+        static constexpr int GetExactMatchedIndex()
+        {
+            return IndexMatcher<0, Types ...>::GetExactMatchedIndex();
+        }
+        
         enum {value = GetMatchedIndex()};
+        enum {exact_type_value = GetMatchedIndex()};
     };
     
     template<int I, typename ... Tail>
@@ -314,7 +331,7 @@ struct VariantTypesEnumerator
     template<int I, typename T, typename ... Tail>
     struct IndexToType<I, T, Tail ...>
     {
-        typedef typename IndexToType<I - 1, Types ...>::type type;
+        typedef typename IndexToType<I - 1, Tail ...>::type type;
     };            
     
     template<typename T, typename ... Tail>
@@ -331,7 +348,7 @@ struct VariantTypesEnumerator
     template<typename R>
     struct RealTypeGetter
     {
-        typedef typename IndexToType<MatchType<R>::value, Types ...>::type type;
+        typedef typename IndexToType<MatchType<R>::exact_type_value, Types ...>::type type;
     };
 };
 
@@ -416,7 +433,7 @@ public:
 #if FL_VARIANT_WITH_TEST == 1
     void *GetDataPointer()
     {
-        return m_Data.GetDataPointer();
+        return m_Data.GetRawDataPointer();
     }
 
 #endif
@@ -426,18 +443,33 @@ private:
     detail::VariantDataHolder<Types...> m_Data;
     
 private:    
-    template<typename R>
-    friend auto get(const this_type& var) -> decltype(var.m_Data.template GetValue<R>(var.m_DataType))
-    {
-        return var.m_Data.template GetValue<R>(var.m_DataType);
-    }
+    template<typename R, typename ... T>
+    friend R get(const Variant<T...>& var);
     
-    template<typename R>
-    friend auto get(const this_type* var) -> decltype(var->m_Data.template GetPointer<R>(var->m_DataType))
-    {
-        return var.m_Data.template GetPointer<R>(var->m_DataType);
-    }
+    template<typename R, typename ... T>
+    friend const R* get(const Variant<T...>* var);
+    
+    template<typename R, typename ... T>
+    friend R* get(Variant<T...>* var);
 };
+
+template<typename R, typename ... T>
+R get(const Variant<T...>& var)
+{
+    return var.m_Data.template GetValue<R>(var.m_DataType);
+}
+
+template<typename R, typename ... T>
+const R* get(const Variant<T...>* var)
+{
+    return var->m_Data.template GetPointer<R>(var->m_DataType);
+}
+
+template<typename R, typename ... T>
+R* get(Variant<T...>* var)
+{
+    return var->m_Data.template GetPointer<R>(var->m_DataType);
+}
 
 }
 
