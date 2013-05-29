@@ -137,7 +137,8 @@ public:
     typedef VariantDataHolder<Types ...> this_type;
     
     VariantDataHolder()
-        : m_Data()
+        : m_DataType(EmptyVariant)
+        , m_Data()
     {
         ;
     }
@@ -154,11 +155,13 @@ public:
         , m_Data()
     {
         MoveData(other, other.m_DataType);
+        other.DestroyData();
     }
     
     template<typename U>
     VariantDataHolder(const U& data)
-        : m_Data()
+        : m_DataType(EmptyVariant)
+        , m_Data()
     {
         constexpr int type = VariantTypesEnumerator<Types ...>::template MatchType<U>::value;
         m_DataType = type;
@@ -168,8 +171,9 @@ public:
     }
     
     template<typename U>
-    VariantDataHolder(U&& data, int &dataType)
-        : m_Data()
+    VariantDataHolder(U&& data)
+        : m_DataType(EmptyVariant)
+        , m_Data()
     {
         constexpr int type = VariantTypesEnumerator<Types ...>::template MatchType<U>::value;
         m_DataType = type;
@@ -181,7 +185,10 @@ public:
     void DestroyData()
     {
         if (m_DataType != EmptyVariant)
+        {
             m_Data.Destroy(m_DataType);
+            m_DataType = EmptyVariant;
+        }
     }
     
     void Swap(this_type &other)
