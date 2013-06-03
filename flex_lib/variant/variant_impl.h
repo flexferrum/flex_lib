@@ -4,9 +4,22 @@
 #include <type_traits>
 #include <iostream>
 #include <cassert>
+#include <exception>
+#include <stdexcept>
 
 namespace flex_lib
 {
+
+class InvalidVariantType : public std::runtime_error
+{
+public:
+    InvalidVariantType() 
+        : runtime_error("Invalid variant type")
+    {
+        ;
+    }
+};
+
 namespace detail
 {
 template<int I, typename ... T>
@@ -93,7 +106,25 @@ union InnerUnion<I, T, Tail...>
     void InitWithMove(U&& data, typename std::enable_if<Idx != I, void>::type* = nullptr)
     {
         m_Tail.InitWithMove<Idx>(data);
-    }        
+    }  
+    
+    template<typename R, typename Fn>
+    R Apply(const Fn& visitor, int dataType) const
+    {
+        if (dataType == I)
+            visitor(m_Data);
+        else
+            return m_Tail.Apply<R>(visitor, dataType);
+    }
+    
+    template<typename R, typename Fn>
+    R Apply(const Fn& visitor, int dataType)
+    {
+        if (dataType == I)
+            visitor(m_Data);
+        else
+            return m_Tail.Apply<R>(visitor, dataType);
+    }
 };
 
 template<int I>
@@ -119,6 +150,13 @@ union InnerUnion<I>
     void SwapWith(InnerUnion<I>&, int)
     {
         assert(false);
+    }
+    
+    template<typename R, typename Fn>
+    R Apply(const Fn&, int) const
+    {
+        assert(false);
+        return R();
     }
 };
 
@@ -165,8 +203,7 @@ public:
     {
         constexpr int type = VariantTypesEnumerator<Types ...>::template MatchType<U>::value;
         m_DataType = type;
-        if (m_DataType == -1)
-            return;        
+        static_assert(type != -1, "Invalid type for variant initialization.");
         InitializeDataCopy<type>(data);
     }
     
@@ -177,7 +214,7 @@ public:
     {
         constexpr int type = VariantTypesEnumerator<Types ...>::template MatchType<U>::value;
         m_DataType = type;
-        if (m_DataType == -1)
+        if (type == -1)
             return;
         InitializeDataMove<type>(data);
     }            
@@ -218,31 +255,96 @@ public:
     template<typename R>
     R GetValue() const
     {
-        typedef typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type result;
+        constexpr int typeId = VariantTypesEnumerator<Types ...>::template MatchType<R>::value;
+        static_assert(typeId != -1, "Can't get value of this type from variant.");
+        typedef typename VariantTypesEnumerator<Types ...>::template TypeForIndex<typeId>::type result;
         
-        return *GetPointer<result>();
+        auto ptr = GetPointer<result>();
+        if (ptr == nullptr)
+            throw InvalidVariantType();
+        
+        return *ptr;
     }
     
     template<typename R>
-    auto GetPointer() const -> const typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type *
+    R GetValue()
     {
-        typedef typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type result;
-        constexpr int type = VariantTypesEnumerator<Types ...>::template MatchType<result>::value;
-        if (type != m_DataType)
+        constexpr int typeId = VariantTypesEnumerator<Types ...>::template MatchType<R>::value;
+        static_assert(typeId != -1, "Can't get value of this type from variant.");
+        typedef typename VariantTypesEnumerator<Types ...>::template TypeForIndex<typeId>::type result;
+        
+        auto ptr = GetPointer<result>();
+        if (ptr == nullptr)
+            throw InvalidVariantType();
+        
+        return *ptr;
+    }
+    
+    template<typename R>
+    R GetExactValue() const
+    {
+        constexpr int typeId = VariantTypesEnumerator<Types ...>::template MatchType<R>::exact_type_value;
+        static_assert(typeId != -1, "Can't get value of this type from variant.");
+        typedef typename VariantTypesEnumerator<Types ...>::template TypeForIndex<typeId>::type result;
+                
+        auto ptr = GetPointer<result>();
+        if (ptr == nullptr)
+            throw InvalidVariantType();
+        
+        return *ptr;
+    }
+    
+    template<typename R>
+    R GetExactValue()
+    {
+        typedef typename std::remove_const<typename std::remove_reference<R>::type>::type clean_type; 
+        constexpr int typeId = VariantTypesEnumerator<Types ...>::template MatchType<clean_type>::exact_type_value;
+        static_assert(typeId != -1, "Can't get value of this type from variant.");
+        typedef typename VariantTypesEnumerator<Types ...>::template TypeForIndex<typeId>::type result;
+        
+        auto ptr = GetPointer<result>();
+        if (ptr == nullptr)
+            throw InvalidVariantType();
+        
+        return *ptr;
+    }
+    
+    template<typename R>
+    auto GetPointer() const -> const typename VariantTypesEnumerator<Types ...>::template TypeForType<R, true>::type *
+    {
+        constexpr int typeId = VariantTypesEnumerator<Types ...>::template MatchType<R>::exact_type_value;
+        static_assert(typeId != -1, "Can't get pointer to value of this type from variant.");
+        
+        typedef typename VariantTypesEnumerator<Types ...>::template TypeForIndex<typeId>::type result;
+        if (typeId != m_DataType)
             return nullptr;        
         
         return reinterpret_cast<const result *>(&m_Data);
     }
     
     template<typename R>
-    auto GetPointer() -> typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type *
+    auto GetPointer() ->  typename VariantTypesEnumerator<Types ...>::template TypeForType<R, true>::type *
     {
-        typedef typename VariantTypesEnumerator<Types ...>::template RealTypeGetter<R>::type result;
-        constexpr int type = VariantTypesEnumerator<Types ...>::template MatchType<result>::value;
-        if (type != m_DataType)
+        constexpr int typeId = VariantTypesEnumerator<Types ...>::template MatchType<R>::exact_type_value;
+        static_assert(typeId != -1, "Can't get pointer to value of this type from variant.");
+        
+        typedef typename VariantTypesEnumerator<Types ...>::template TypeForIndex<typeId>::type result;
+        if (typeId != m_DataType)
             return nullptr;        
         
         return reinterpret_cast<result *>(&m_Data);
+    }
+    
+    template<typename R, typename Fn>
+    R ApplyVisitor(const Fn& visitor) const
+    {
+        return m_Data.template Apply<R>(visitor, m_DataType);
+    }
+    
+    template<typename R, typename Fn>
+    R ApplyVisitor(const Fn& visitor)
+    {
+        return m_Data.template Apply<R>(visitor, m_DataType);
     }
     
     void * GetRawDataPointer()
@@ -333,7 +435,7 @@ struct VariantTypesEnumerator
         }
         
         enum {value = GetMatchedIndex()};
-        enum {exact_type_value = GetMatchedIndex()};
+        enum {exact_type_value = GetExactMatchedIndex()};
     };
     
     template<int I, typename ... Tail>
@@ -356,10 +458,20 @@ struct VariantTypesEnumerator
     {
     };            
     
-    template<typename R>
-    struct RealTypeGetter
+    template<int I>
+    struct TypeForIndex
     {
-        typedef typename IndexToType<MatchType<R>::exact_type_value, Types ...>::type type;
+        typedef typename IndexToType<I, Types ...>::type type;
+    };
+    
+    template<typename T, bool exactMatch>
+    struct TypeForType : public TypeForIndex<exactMatch ? MatchType<T>::exact_type_value : MatchType<T>::value>
+    {
+    };
+    
+    struct FirstType
+    {
+        typedef typename TypeForIndex<0>::type type;
     };
 };
 
@@ -449,6 +561,17 @@ public:
     }
 
 #endif
+    template<typename R, typename Fn>
+    R ApplyVisitor(const Fn& visitor) const
+    {
+        return m_Data.ApplyVisitor<R>(visitor);
+    }
+    
+    template<typename R, typename Fn>
+    R ApplyVisitor(const Fn& visitor)
+    {
+        return m_Data.ApplyVisitor<R>(visitor);
+    }
     
 private:    
     detail::VariantDataHolder<Types...> m_Data;
@@ -456,6 +579,15 @@ private:
 private:    
     template<typename R, typename ... T>
     friend R get(const Variant<T...>& var);
+    
+    template<typename R, typename ... T>
+    friend R get(Variant<T...>& var);
+    
+    template<typename R, typename ... T>
+    friend R safe_get(const Variant<T...>& var);
+    
+    template<typename R, typename ... T>
+    friend R safe_get(Variant<T...>& var);
     
     template<typename R, typename ... T>
     friend const R* get(const Variant<T...>* var);
@@ -467,9 +599,26 @@ private:
 template<typename R, typename ... T>
 R get(const Variant<T...>& var)
 {
+    return var.m_Data.template GetExactValue<R>();
+}
+
+template<typename R, typename ... T>
+R get(Variant<T...>& var)
+{
+    return var.m_Data.template GetExactValue<R>();
+}
+
+template<typename R, typename ... T>
+R safe_get(const Variant<T...>& var)
+{
     return var.m_Data.template GetValue<R>();
 }
 
+template<typename R, typename ... T>
+R safe_get(Variant<T...>& var)
+{
+    return var.m_Data.template GetValue<R>();
+}
 template<typename R, typename ... T>
 const R* get(const Variant<T...>* var)
 {
@@ -480,6 +629,12 @@ template<typename R, typename ... T>
 R* get(Variant<T...>* var)
 {
     return var->m_Data.template GetPointer<R>();
+}
+
+template<typename ... Types>
+void swap(Variant<Types...>& lhs, Variant<Types...>& rhs)
+{
+    lhs.swap(rhs);
 }
 
 }

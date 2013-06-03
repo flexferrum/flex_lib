@@ -6,6 +6,7 @@
 #define FL_VARIANT_WITH_TEST 1
 
 #include <flex_lib/variant.h>
+#include <flex_lib/variant/static_visitor.h>
 
 TEST(Variant, EmptyInitialization)
 {
@@ -292,7 +293,7 @@ TEST(Variant, ValueGetter)
         EXPECT_TRUE((std::is_same<decltype(val), int>::value));
         EXPECT_EQ(10, val);
         
-        auto val2 = flex_lib::get<short>(v1);
+        auto val2 = flex_lib::safe_get<short>(v1);
         EXPECT_TRUE((std::is_same<decltype(val2), short>::value));
         EXPECT_EQ(10, val2);
         
@@ -305,6 +306,33 @@ TEST(Variant, ValueGetter)
         
         auto val_ptr1 = flex_lib::get<double>(&v1);
         EXPECT_EQ(nullptr, val_ptr1);
+        
+        EXPECT_THROW((flex_lib::get<double>(v1)), flex_lib::InvalidVariantType);
+        EXPECT_THROW((flex_lib::safe_get<double>(v1)), flex_lib::InvalidVariantType);
+    }
+    
+    {
+        const Variant v1(10);
+        EXPECT_FALSE(v1.IsEmpty());
+        EXPECT_EQ(0, v1.Which());
+
+        auto val = flex_lib::get<int>(v1);
+        EXPECT_TRUE((std::is_same<decltype(val), int>::value));
+        EXPECT_EQ(10, val);
+        
+        auto val2 = flex_lib::safe_get<short>(v1);
+        EXPECT_TRUE((std::is_same<decltype(val2), short>::value));
+        EXPECT_EQ(10, val2);
+        
+        auto val_ptr = flex_lib::get<int>(&v1);
+        EXPECT_TRUE((std::is_same<decltype(val_ptr), const int*>::value));
+        EXPECT_NE((const int*)nullptr, val_ptr);
+        EXPECT_EQ(10, *val_ptr);
+        
+        auto val_ptr1 = flex_lib::get<double>(&v1);
+        EXPECT_EQ(nullptr, val_ptr1);
+        EXPECT_THROW(flex_lib::get<double>(v1), flex_lib::InvalidVariantType);
+        EXPECT_THROW(flex_lib::safe_get<double>(v1), flex_lib::InvalidVariantType);
     }
     
     {
@@ -372,6 +400,127 @@ TEST(Variant, ValueAssignment)
     EXPECT_FALSE(v.IsEmpty());
     EXPECT_EQ(3, v.Which());
     EXPECT_EQ(str, *(std::string*)v.GetDataPointer());
+}
+
+enum class TypeName
+{
+    None = -1,
+    Int,
+    IntPtr,
+    Double,
+    Char,
+    String,
+    Default
+};
+
+struct TestVisitor
+{
+    mutable TypeName m_Visited;
+    
+    TestVisitor() : m_Visited(TypeName::None) {}
+    
+    void operator()(int) const
+    {
+        m_Visited = TypeName::Int;
+    }
+    
+    void operator()(double) const
+    {
+        m_Visited = TypeName::Double;
+    }
+    
+    void operator()(char) const
+    {
+        m_Visited = TypeName::Char;
+    }
+    
+    void operator()(const std::string &) const
+    {
+        m_Visited = TypeName::String;
+    }
+
+    template<typename T>    
+    void operator()(const T&) const
+    {
+        m_Visited = TypeName::Default;
+    }
+};
+
+
+struct TestVisitor1
+{
+    template<typename T>
+    TypeName operator()(const T& val) const
+    {
+        typedef typename std::remove_all_extents<T>::type Type;
+        
+        TypeName result = TypeName::None;
+        
+        if (std::is_same<Type, int>::value)
+            result = TypeName::Int;
+        else if (std::is_same<Type, double>::value)
+            result = TypeName::Double;
+        else if (std::is_same<Type, char>::value)
+            result = TypeName::Char;
+        else if (std::is_same<Type, std::string>::value)
+            result = TypeName::String;
+        else if (std::is_same<Type, int*>::value)
+            result = TypeName::IntPtr;
+        
+        return result;
+    }
+};
+
+TEST(Variant, StaticVisitor)
+{
+    typedef flex_lib::Variant<int, double, char, std::string, int*> Variant;
+    
+    Variant v;
+    v = 10;
+    {
+        TestVisitor visitor;
+
+        flex_lib::apply_visitor(v, visitor);
+        EXPECT_EQ(TypeName::Int, visitor.m_Visited);
+        EXPECT_EQ(TypeName::Int, flex_lib::apply_visitor(v, TestVisitor1()));
+    }
+    
+    v = 20.0;
+    {
+        TestVisitor visitor;
+
+        flex_lib::apply_visitor(const_cast<const Variant&>(v), visitor);
+        EXPECT_EQ(TypeName::Double, visitor.m_Visited);
+        EXPECT_EQ(TypeName::Double, flex_lib::apply_visitor(v, TestVisitor1()));
+    }
+    
+    v = '0';
+    {
+        TestVisitor visitor;
+
+        flex_lib::apply_visitor(v, visitor);
+        EXPECT_EQ(TypeName::Char, visitor.m_Visited);
+        EXPECT_EQ(TypeName::Char, flex_lib::apply_visitor(v, TestVisitor1()));
+    }
+    
+    v = "abcd";
+    {
+        TestVisitor visitor;
+
+        flex_lib::apply_visitor(v, visitor);
+        EXPECT_EQ(TypeName::String, visitor.m_Visited);
+        EXPECT_EQ(TypeName::String, flex_lib::apply_visitor(v, TestVisitor1()));
+    }
+    
+    v = (int*)nullptr;
+    {
+        TestVisitor visitor;
+
+        flex_lib::apply_visitor(v, visitor);
+        EXPECT_EQ(TypeName::Default, visitor.m_Visited);
+        EXPECT_EQ(TypeName::IntPtr, flex_lib::apply_visitor(v, TestVisitor1()));
+    }
+    
 }
 
 int main(int argc, char* argv[])
