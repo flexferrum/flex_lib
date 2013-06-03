@@ -24,4 +24,4 @@ auto apply_visitor(const Variant<Types...>& v, const VFn& visitor) -> typename s
 }
 }
 
-#endif // STATIC_VISITOR_H
+#endif // FLEX_LIB_VARIANT_STATIC_VISITOR_H

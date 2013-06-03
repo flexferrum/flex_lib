@@ -1,6 +1,7 @@
 set(VARIANT_HEADERS 
         ../../flex_lib/variant.h
         ../../flex_lib/variant/variant_impl.h
+        ../../flex_lib/variant/static_visitor.h
 #        ../../flex_lib/lazy_list.inl.h
 )
 
