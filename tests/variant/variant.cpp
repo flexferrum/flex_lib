@@ -481,8 +481,8 @@ TEST(Variant, StaticVisitor)
         TestVisitor visitor;
 
         flex_lib::apply_visitor(v, visitor);
-        EXPECT_EQ(TypeName::Int, visitor.m_Visited);
-        EXPECT_EQ(TypeName::Int, flex_lib::apply_visitor(v, TestVisitor1()));
+        EXPECT_EQ((int)TypeName::Int, (int)visitor.m_Visited);
+        EXPECT_EQ((int)TypeName::Int, (int)flex_lib::apply_visitor(v, TestVisitor1()));
     }
     
     v = 20.0;
@@ -490,8 +490,8 @@ TEST(Variant, StaticVisitor)
         TestVisitor visitor;
 
         flex_lib::apply_visitor(const_cast<const Variant&>(v), visitor);
-        EXPECT_EQ(TypeName::Double, visitor.m_Visited);
-        EXPECT_EQ(TypeName::Double, flex_lib::apply_visitor(v, TestVisitor1()));
+        EXPECT_EQ((int)TypeName::Double, (int)visitor.m_Visited);
+        EXPECT_EQ((int)TypeName::Double, (int)flex_lib::apply_visitor(v, TestVisitor1()));
     }
     
     v = '0';
@@ -499,8 +499,8 @@ TEST(Variant, StaticVisitor)
         TestVisitor visitor;
 
         flex_lib::apply_visitor(v, visitor);
-        EXPECT_EQ(TypeName::Char, visitor.m_Visited);
-        EXPECT_EQ(TypeName::Char, flex_lib::apply_visitor(v, TestVisitor1()));
+        EXPECT_EQ((int)TypeName::Char, (int)visitor.m_Visited);
+        EXPECT_EQ((int)TypeName::Char, (int)flex_lib::apply_visitor(v, TestVisitor1()));
     }
     
     v = "abcd";
@@ -508,8 +508,8 @@ TEST(Variant, StaticVisitor)
         TestVisitor visitor;
 
         flex_lib::apply_visitor(v, visitor);
-        EXPECT_EQ(TypeName::String, visitor.m_Visited);
-        EXPECT_EQ(TypeName::String, flex_lib::apply_visitor(v, TestVisitor1()));
+        EXPECT_EQ((int)TypeName::String, (int)visitor.m_Visited);
+        EXPECT_EQ((int)TypeName::String, (int)flex_lib::apply_visitor(v, TestVisitor1()));
     }
     
     v = (int*)nullptr;
@@ -517,8 +517,8 @@ TEST(Variant, StaticVisitor)
         TestVisitor visitor;
 
         flex_lib::apply_visitor(v, visitor);
-        EXPECT_EQ(TypeName::Default, visitor.m_Visited);
-        EXPECT_EQ(TypeName::IntPtr, flex_lib::apply_visitor(v, TestVisitor1()));
+        EXPECT_EQ((int)TypeName::Default, (int)visitor.m_Visited);
+        EXPECT_EQ((int)TypeName::IntPtr, (int)flex_lib::apply_visitor(v, TestVisitor1()));
     }
     
 }
