@@ -1,5 +1,6 @@
 // This is a part of lazy_list.h file.
 
+#if 0
 template<typename NT, template <typename> class A>
 lazy_list<NT, A> lazy_list<NT, A>::tail() const
 {
@@ -26,5 +27,6 @@ lazy_list<NT, A> lazy_list<NT, A>::tail() const
 		return initer(isEOS);
 	});
 }
+#endif
 
 
