@@ -6,15 +6,14 @@ else()
     set(GTEST_INCLUDE_DIRS "${GTEST_ROOT}/fused-src")
 endif()
 
-message(${GTEST_INCLUDE_DIRS})
-
 find_package(Boost)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(FLEX_LIB_INCLUDE_DIR "flex_lib")
 
-
-include_directories("./" ${GTEST_INCLUDE_DIRS})
+include_directories("./")
 
 add_subdirectory(sources)
+if (GTEST_INCLUDE_DIRS)
 add_subdirectory(tests)
+endif ()

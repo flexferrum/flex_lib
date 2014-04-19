@@ -1,6 +1,8 @@
 #ifndef FLEX_LIB_LAZY_LIST_COMMON_H
 #define FLEX_LIB_LAZY_LIST_COMMON_H
 
+#include <functional>
+
 namespace flex_lib 
 {
 template<typename VT, bool isLazy>

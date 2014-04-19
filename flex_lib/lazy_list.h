@@ -1,6 +1,7 @@
 #ifndef FLEX_LIB_LAZY_LIST_H__
 #define FLEX_LIB_LAZY_LIST_H__
 
+#include "config/config.h"
 #include "lazy_list/lazy_list_impl.h"
 #include "lazy_list/lazy_list_iterator.h"
 #include "lazy_list/lazy_list_factory.h"

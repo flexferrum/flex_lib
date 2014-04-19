@@ -5,6 +5,7 @@
 
 #include <list>
 #include <functional>
+#include "../variant.h"
 
 namespace flex_lib 
 {
@@ -117,29 +118,16 @@ private:
     
     struct NodeIniterHolder
     {
-        union
-        {
-            char dummy[1];
-            LazyNodeIniter m_lazyNodeIniter;
-            ValueNodeIniter m_valueNodeIniter;
-        };
-        bool m_isLazy;
+        Variant<LazyNodeIniter, ValueNodeIniter> m_initer;
         
-        NodeIniterHolder() : m_isLazy(true) {}
-        NodeIniterHolder(const NodeIniterHolder &other) : m_isLazy(other.m_isLazy) 
+        bool IsLazy() const {return m_initer.Which() == 0;}        
+        LazyNodeIniter *GetLazyIniter() {return get<LazyNodeIniter>(&m_initer);}
+        ValueNodeIniter *GetValueIniter() {return get<ValueNodeIniter>(&m_initer);}
+        
+        template<typename T>
+        void SetIniter(T &&initer)
         {
-            if (m_isLazy)
-                new (&m_lazyNodeIniter) LazyNodeIniter(other.m_lazyNodeIniter);
-            else
-                new (&m_valueNodeIniter) ValueNodeIniter(other.m_valueNodeIniter);
-        }
-
-        ~NodeIniterHolder()
-        {
-            if (m_isLazy)
-                m_lazyNodeIniter.~LazyNodeIniter();
-            else
-                m_valueNodeIniter.~ValueNodeIniter();
+            m_initer = std::move(initer);
         }
     } m_nodeIniter;
 
@@ -148,14 +136,14 @@ private:
         // std::cout << "Construct next node" << std::endl;
 
         bool is_final_node;
-        if (m_nodeIniter.m_isLazy)
-            is_final_node = !m_nodeIniter.m_lazyNodeIniter(node.node_evtor);
+        if (m_nodeIniter.IsLazy())
+            is_final_node = !(*m_nodeIniter.GetLazyIniter())(node.node_evtor);
         else
         {
-            is_final_node = !m_nodeIniter.m_valueNodeIniter(node.node_value);
+            is_final_node = !(*m_nodeIniter.GetValueIniter())(node.node_value);
             node.is_evaluated = true;
         }
-        inner_list.push_back(node_type_t([](this_type* list, node_type_t& node) -> bool
+        inner_list.emplace_back(node_type_t([](this_type* list, node_type_t& node) -> bool
         {
             return list->NodeConstructor(list, node);
         }));
@@ -165,9 +153,8 @@ private:
 
     void InitLazyList(LazyNodeIniter &&initFn)
     {
-        new (&m_nodeIniter.m_lazyNodeIniter) LazyNodeIniter(std::move(initFn));
-        m_nodeIniter.m_isLazy = true;
-        inner_list.push_back(node_type_t([](this_type* list, node_type_t& node) mutable -> bool
+        m_nodeIniter.SetIniter(std::move(initFn));
+        inner_list.emplace_back(node_type_t([](this_type* list, node_type_t& node) mutable -> bool
         {
             return list->NodeConstructor(list, node);
         }));
@@ -175,8 +162,7 @@ private:
     
     void InitValueList(ValueNodeIniter &&initFn)
     {
-        new (&m_nodeIniter.m_valueNodeIniter) ValueNodeIniter(std::move(initFn));
-        m_nodeIniter.m_isLazy = false;
+        m_nodeIniter.SetIniter(std::move(initFn));
         inner_list.push_back(node_type_t([](this_type* list, node_type_t& node) mutable -> bool
         {
             return list->NodeConstructor(list, node);

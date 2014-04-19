@@ -1,11 +1,16 @@
 #ifndef FLEX_LIB_VARIANT_IMPL_H
 #define FLEX_LIB_VARIANT_IMPL_H
 
+#include "../config/config.h"
 #include <type_traits>
 #include <iostream>
 #include <cassert>
 #include <exception>
 #include <stdexcept>
+
+#if !FL_CXX11_SUPPORT_UNRESTRICTEDUNIONS
+#error This implementation of variant is available only for compilers with 'unrestricted union' feature available
+#endif
 
 namespace flex_lib
 {
@@ -93,7 +98,7 @@ union InnerUnion<I, T, Tail...>
     template<int Idx, typename U>
     void InitWithCopy(const U& data, typename std::enable_if<Idx != I, void>::type* = nullptr)
     {
-        m_Tail.InitWithCopy<Idx>(data);
+        m_Tail.template InitWithCopy<Idx>(data);
     }
     
     template<int Idx, typename U>
@@ -112,18 +117,18 @@ union InnerUnion<I, T, Tail...>
     R Apply(const Fn& visitor, int dataType) const
     {
         if (dataType == I)
-            visitor(m_Data);
+            return visitor(m_Data);
         else
-            return m_Tail.Apply<R>(visitor, dataType);
+            return m_Tail.template Apply<R>(visitor, dataType);
     }
     
     template<typename R, typename Fn>
     R Apply(const Fn& visitor, int dataType)
     {
         if (dataType == I)
-            visitor(m_Data);
+            return visitor(m_Data);
         else
-            return m_Tail.Apply<R>(visitor, dataType);
+            return m_Tail.template Apply<R>(visitor, dataType);
     }
 };
 
@@ -405,37 +410,30 @@ struct VariantTypesEnumerator
         template<int I, typename ... Tail>
         struct IndexMatcher
         {
-            static constexpr int GetMatchedIndex() {return -1;}
-            static constexpr int GetExactMatchedIndex() {return -1;}
+            // static constexpr int GetMatchedIndex() {return -1;}
+            // static constexpr int GetExactMatchedIndex() {return -1;}
+            typedef struct MatchedIndex_ : public std::integral_constant<int, -1> {} MatchedIndex;
+            typedef struct ExactMatchedIndex_ : public std::integral_constant<int, -1> {} ExactMatchedIndex;
         };
         
         template<int I, typename T, typename ... Tail>
         struct IndexMatcher<I, T, Tail...>
         {
-            static constexpr int GetMatchedIndex()
+            typedef typename std::remove_reference<typename std::remove_cv<U>::type>::type TypeWithoutRefs;
+            typedef struct MatchedIndex_ : 
+                    std::integral_constant<int, std::is_convertible<U, T>::value ? I : IndexMatcher<I + 1, Tail ...>::MatchedIndex::value> 
             {
-                return std::is_convertible<U, T>::value ? I : IndexMatcher<I + 1, Tail ...>::GetMatchedIndex();
-            }
-            
-            static constexpr int GetExactMatchedIndex()
+                
+            } MatchedIndex;
+            typedef struct ExactMatchedIndex_ : 
+                    std::integral_constant<int, std::is_same<TypeWithoutRefs, T>::value ? I : IndexMatcher<I + 1, Tail ...>::ExactMatchedIndex::value> 
             {
-                typedef typename std::remove_reference<typename std::remove_cv<U>::type>::type type;
-                return std::is_same<type, T>::value ? I : IndexMatcher<I + 1, Tail ...>::GetExactMatchedIndex();
-            }
+                
+            } ExactMatchedIndex;
         };
         
-        static constexpr int GetMatchedIndex()
-        {
-            return IndexMatcher<0, Types ...>::GetExactMatchedIndex() != -1 ? IndexMatcher<0, Types ...>::GetExactMatchedIndex() : IndexMatcher<0, Types ...>::GetMatchedIndex();
-        }
-        
-        static constexpr int GetExactMatchedIndex()
-        {
-            return IndexMatcher<0, Types ...>::GetExactMatchedIndex();
-        }
-        
-        enum {value = GetMatchedIndex()};
-        enum {exact_type_value = GetExactMatchedIndex()};
+        enum {value = IndexMatcher<0, Types ...>::ExactMatchedIndex::value != -1 ? IndexMatcher<0, Types ...>::ExactMatchedIndex::value : IndexMatcher<0, Types ...>::MatchedIndex::value};
+        enum {exact_type_value = IndexMatcher<0, Types ...>::ExactMatchedIndex::value};
     };
     
     template<int I, typename ... Tail>
@@ -564,13 +562,13 @@ public:
     template<typename R, typename Fn>
     R ApplyVisitor(const Fn& visitor) const
     {
-        return m_Data.ApplyVisitor<R>(visitor);
+        return m_Data.template ApplyVisitor<R>(visitor);
     }
     
     template<typename R, typename Fn>
     R ApplyVisitor(const Fn& visitor)
     {
-        return m_Data.ApplyVisitor<R>(visitor);
+        return m_Data.template ApplyVisitor<R>(visitor);
     }
     
 private:    
