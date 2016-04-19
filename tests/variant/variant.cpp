@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-#include <gtest/gtest-all.cc>
 
 #include <string>
 

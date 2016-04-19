@@ -1,20 +1,14 @@
-set(VARIANT_HEADERS 
-        ../../flex_lib/variant.h
-        ../../flex_lib/variant/variant_impl.h
-        ../../flex_lib/variant/static_visitor.h
-#        ../../flex_lib/lazy_list.inl.h
-)
+project (variant_tests)
 
-set(VARIANT_SOURCES)
+include (collect_sources)
 
-set(VARIANT_TEST_SOURCES
-        variant.cpp
+CollectSources(Sources Headers ${CMAKE_CURRENT_SOURCE_DIR}  ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(${PROJECT_NAME}
+    ${Sources}
+    ${Headers}
     )
 
-add_executable(variant_tests
-    ${VARIANT_HEADERS}
-    ${VARIANT_SOURCES}
-    ${VARIANT_TEST_SOURCES}
-    )
+target_link_libraries(${PROJECT_NAME} ${GTEST_BOTH_LIBRARIES})
 
-add_test(variant_tests variant_tests)
+add_test(${PROJECT_NAME} ${PROJECT_NAME})

@@ -1,7 +1,6 @@
 // lazy_list.cpp : Defines the entry point for the console application.
 //
 #include <gtest/gtest.h>
-#include <gtest/gtest-all.cc>
 
 #include <flex_lib/config/config.h>
 #include <flex_lib/lazy_list.h>

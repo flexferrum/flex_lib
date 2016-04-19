@@ -1,18 +1,14 @@
-set(LAZY_LIST_HEADERS 
-        ../../flex_lib/lazy_list.h
-        ../../flex_lib/lazy_list.inl.h
-)
+project (lazy_list_tests)
 
-set(LAZY_LIST_SOURCES)
+include (collect_sources)
 
-set(LAZY_LIST_TEST_SOURCES
-        lazy_list.cpp
+CollectSources(Sources Headers ${CMAKE_CURRENT_SOURCE_DIR}  ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(${PROJECT_NAME}
+    ${Sources}
+    ${Headers}
     )
 
-add_executable(lazy_list_tests
-    ${LAZY_LIST_HEADERS}
-    ${LAZY_LIST_SOURCES}
-    ${LAZY_LIST_TEST_SOURCES}
-    )
+target_link_libraries(${PROJECT_NAME} ${GTEST_BOTH_LIBRARIES})
 
-add_test(lazy_list_tests lazy_list_tests)
+add_test(${PROJECT_NAME} ${PROJECT_NAME})
