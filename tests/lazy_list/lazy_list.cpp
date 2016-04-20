@@ -345,7 +345,6 @@ TEST(LazyList, Cons)
 	EXPECT_TRUE(it == l2.end());
 }
 
-
 TEST(LazyList, ValidateLazyCons)
 {
     size_t count = 0;
@@ -372,6 +371,80 @@ TEST(LazyList, ValidateLazyCons)
 	EXPECT_EQ(6, count);
 }
 
+TEST(LazyList, Filter)
+{
+	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
+
+    auto l2(fl::lazy_from(items1).filter([](uint64_t val) {return (val % 2) != 0;}).toList());
+
+	auto it = l2.begin();
+	EXPECT_EQ(items1[1], *it ++);
+	EXPECT_EQ(items1[3], *it ++);
+	EXPECT_EQ(items1[5], *it ++);
+	EXPECT_TRUE(it == l2.end());
+}
+
+TEST(LazyList, Map)
+{
+	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
+
+    auto l2(fl::lazy_from(items1).map([](uint64_t val) {return std::to_string(val);}).toList());
+
+	auto it = l2.begin();
+    EXPECT_EQ(std::string("0"), *it ++);
+	EXPECT_EQ(std::string("1"), *it ++);
+    EXPECT_EQ(std::string("2"), *it ++);
+    EXPECT_EQ(std::string("3"), *it ++);
+    EXPECT_EQ(std::string("4"), *it ++);
+    EXPECT_EQ(std::string("5"), *it ++);
+	EXPECT_TRUE(it == l2.end());
+}
+
+TEST(LazyList, Zip)
+{
+	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
+
+    auto l1(fl::lazy_from(items1).toList());
+    auto l2(fl::lazy_from(l1).zip(l1, [](uint64_t v1, uint64_t v2) {return v1 * v2;}).toList());
+
+	auto it = l2.begin();
+    EXPECT_EQ(0, *it ++);
+	EXPECT_EQ(1, *it ++);
+    EXPECT_EQ(4, *it ++);
+    EXPECT_EQ(9, *it ++);
+    EXPECT_EQ(16, *it ++);
+    EXPECT_EQ(25, *it ++);
+	EXPECT_TRUE(it == l2.end());
+}
+
+TEST(LazyList, ZipLazySequence)
+{
+    auto l1(fl::lazy_sequence<uint64_t>(6).toList());
+    auto l2(fl::lazy_from(l1).zip(l1, [](uint64_t v1, uint64_t v2) {return v1 * v2;}).toList());
+
+	auto it = l2.begin();
+    EXPECT_EQ(0, *it ++);
+	EXPECT_EQ(1, *it ++);
+    EXPECT_EQ(4, *it ++);
+    EXPECT_EQ(9, *it ++);
+    EXPECT_EQ(16, *it ++);
+    EXPECT_EQ(25, *it ++);
+	EXPECT_TRUE(it == l2.end());
+}
+
+TEST(LazyList, ZipSelfLazySequence)
+{
+    auto l2(fl::lazy_sequence<uint64_t>(6).zip_self([](uint64_t v1, uint64_t v2) {return v1 * v2;}).toList());
+
+	auto it = l2.begin();
+    EXPECT_EQ(0, *it ++);
+	EXPECT_EQ(1, *it ++);
+    EXPECT_EQ(4, *it ++);
+    EXPECT_EQ(9, *it ++);
+    EXPECT_EQ(16, *it ++);
+    EXPECT_EQ(25, *it ++);
+	EXPECT_TRUE(it == l2.end());
+}
 int main(int argc, char* argv[])
 {
 	testing::InitGoogleTest(&argc, argv);

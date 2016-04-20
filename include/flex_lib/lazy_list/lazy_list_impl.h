@@ -43,9 +43,9 @@ public:
     {
     }
     
-    const_iterator begin() const {return const_iterator(*this, m_constructor->m_items.begin());}
+    const_iterator begin() const {return !m_constructor ? const_iterator(*this) : const_iterator(*this, m_constructor->m_items.begin());}
     const_iterator end() const {return const_iterator(*this);}
-    const_iterator constructed_end() const {return const_iterator(*this, -- m_constructor->m_items.end());}
+    const_iterator constructed_end() const {return !m_constructor ? const_iterator(*this) : const_iterator(*this, -- m_constructor->m_items.end());}
 
     const_iterator cbegin() const {return begin();}
     const_iterator cend() const {return end();}
@@ -53,13 +53,6 @@ public:
     const_reference_type front() const {return *begin();}
 
     const_reference_type head() const {return front();}
-
-    template<typename F, typename ... Args>
-    struct result_of
-    {
-        static F f;
-        typedef decltype(f(Args() ...)) type;
-    };
 
     bool empty() const
     {
@@ -75,27 +68,6 @@ private:
     mutable ListConstructorPtr m_constructor;
     friend class lazy_list_iterator<this_type>;
 
-    bool NodeConstructor() // this_type* list, node_type_t& node)
-    {
-#if 0
-        // std::cout << "Construct next node" << std::endl;
-
-        bool is_final_node = false;
-        if (m_nodeIniter.IsLazy())
-            node.node_evtor = (*m_nodeIniter.GetLazyIniter())(is_final_node);
-        else
-        {
-            node.node_value = (*m_nodeIniter.GetValueIniter())(is_final_node);
-            node.is_evaluated = true;
-        }
-        inner_list.emplace_back(node_type_t([](this_type* list, node_type_t& node)
-        {
-            return list->NodeConstructor(list, node);
-        }));
-
-        return !is_final_node;
-#endif
-    }
 };
 }
 

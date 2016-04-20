@@ -9,9 +9,6 @@
 namespace flex_lib {
 namespace detail {
 
-//template<typename VT, typename Gen>
-//auto MakeLazyListBuilder(Gen &&gen);
-
 template<typename VT, typename Gen>
 class LazyListBuilder
 {
@@ -92,6 +89,82 @@ public:
         
         return MakeLazyListBuilder<VT>(std::move(newGen));
     }
+    
+    template<typename Fn>
+    auto filter(Fn filter) &&
+    {
+        auto newGen = [filter, gen = std::move(m_gen)](bool &isEos) mutable
+        {
+            do
+            {
+                auto val = gen(isEos);
+                if (!isEos && filter(val))
+                    return val;
+                
+            } while (!isEos);
+            
+            return VT();
+        };
+        
+        return MakeLazyListBuilder<VT>(std::move(newGen));
+    }
+    
+    template<typename Fn>
+    auto map(Fn mapper) &&
+    {
+        typedef std::decay_t<decltype(mapper(VT()))> MVT;
+        
+        auto newGen = [mapper, gen = std::move(m_gen)](bool &isEos) mutable
+        {
+            auto val = gen(isEos);
+            if (!isEos)
+                return mapper(val);
+            
+            return MVT();
+        };
+        
+        return MakeLazyListBuilder<MVT>(std::move(newGen));
+    }
+    
+    template<typename VT2, typename Fn>
+    auto zip(const lazy_list<VT2> &l2, Fn zipper) &&
+    {
+        typedef std::decay_t<decltype(zipper(VT(), VT2()))> ZVT;
+        
+        auto newGen = [zipper, b = l2.begin(), e = l2.end(), gen = std::move(m_gen)](bool &isEos) mutable
+        {
+            if (b != e)
+            {
+                auto v2 = *b ++;
+                auto v1 = gen(isEos);
+                if (!isEos)
+                    return zipper(v1, v2);
+            }
+            else
+                isEos = true;
+            
+            return ZVT();
+        };
+        
+        return MakeLazyListBuilder<ZVT>(std::move(newGen));
+    }    
+    
+    template<typename Fn>
+    auto zip_self(Fn zipper) &&
+    {
+        typedef std::decay_t<decltype(zipper(VT(), VT()))> ZVT;
+        
+        auto newGen = [zipper, gen = std::move(m_gen)](bool &isEos) mutable
+        {
+            auto v = gen(isEos);
+            if (!isEos)
+                return zipper(v, v);
+            
+            return ZVT();
+        };
+        
+        return MakeLazyListBuilder<ZVT>(std::move(newGen));
+    }    
 
 private:
     Gen m_gen;
