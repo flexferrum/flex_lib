@@ -3,6 +3,10 @@
 
 #include <list>
 
+#if defined(Yield)
+#undef Yield
+#endif
+
 namespace flex_lib 
 {
 template<typename VT>

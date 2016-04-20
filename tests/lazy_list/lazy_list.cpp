@@ -67,7 +67,7 @@ TEST(LazyList, SequencePtrInit)
 {
 	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
 
-	TestLazyList l1 = fl::lazy_from(std::begin(items1), std::end(items1)).toList();
+	TestLazyList l1 = fl::lazy_from(std::begin(items1), std::end(items1)).done();
 	EXPECT_EQ(sizeof(items1) / sizeof(items1[0]), l1.size());
 
 	auto it = l1.begin();
@@ -84,7 +84,7 @@ TEST(LazyList, SequenceArrayInit)
 {
 	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
 
-	TestLazyList l1 = fl::lazy_from(items1).toList();
+	TestLazyList l1 = fl::lazy_from(items1).done();
 	EXPECT_EQ(sizeof(items1) / sizeof(items1[0]), l1.size());
 
 	auto it = l1.begin();
@@ -101,7 +101,7 @@ TEST(LazyList, SequenceIteratorInit)
 {
 	std::vector<uint64_t> items1{0, 1, 2, 3, 4, 5};
 
-    TestLazyList l1 = fl::lazy_from(items1.begin(), items1.end()).toList();
+    TestLazyList l1 = fl::lazy_from(items1.begin(), items1.end()).done();
     EXPECT_EQ(items1.size(), l1.size());
 
 	auto it = l1.begin();
@@ -118,7 +118,7 @@ TEST(LazyList, SequenceContainerInit)
 {
 	std::vector<uint64_t> items1{0, 1, 2, 3, 4, 5};
 
-    TestLazyList l1 = fl::lazy_from(items1).toList();
+    TestLazyList l1 = fl::lazy_from(items1).done();
     EXPECT_EQ(items1.size(), l1.size());
 
 	auto it = l1.begin();
@@ -147,7 +147,7 @@ TEST(LazyList, FunctorInit)
         return items1[next_val] = next_val;
 	};
 
-    TestLazyList l1 = fl::lazy_generate(std::move(ftor)).toList();
+    TestLazyList l1 = fl::lazy_generate(std::move(ftor)).done();
 	EXPECT_EQ(6, l1.size());
 
 	auto it = l1.begin();
@@ -183,7 +183,7 @@ TEST(LazyList, LazyFunctorInit)
 	size_t count = 0;
 	uint64_t items1[6];
 
-    auto l1(MakeTestLazyList(items1, count).toList());
+    auto l1(MakeTestLazyList(items1, count).done());
 	EXPECT_EQ(6, l1.size());
 
 	auto it = l1.begin();
@@ -202,7 +202,7 @@ TEST(LazyList, ValidateLazy1)
     size_t count = 0;
 	uint64_t items1[6];
 
-    auto l1(MakeTestLazyList(items1, count).toList());
+    auto l1(MakeTestLazyList(items1, count).done());
 
 	auto it = l1.begin();
 	EXPECT_EQ(0, count);
@@ -240,7 +240,7 @@ TEST(LazyList, ValidateLazy2)
         return LazyNode<uint64_t>([next_val, &ic]() -> uint64_t {++ ic; return next_val;});
 	};
 
-    auto l1 = fl::lazy_generate(std::move(ftor)).toList();
+    auto l1 = fl::lazy_generate(std::move(ftor)).done();
 
 	auto it = l1.begin();
 	EXPECT_EQ(0, count);
@@ -286,7 +286,7 @@ TEST(LazyList, Head)
 {
 	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
 
-    auto l1(fl::lazy_from(items1).toList());
+    auto l1(fl::lazy_from(items1).done());
 
 	EXPECT_EQ(items1[0], l1.head());
 }
@@ -295,7 +295,7 @@ TEST(LazyList, Tail)
 {
 	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
 
-    auto l2(fl::lazy_from(items1).tail().toList());
+    auto l2(fl::lazy_from(items1).tail().done());
 
 	auto it = l2.begin();
 	EXPECT_EQ(items1[1], *it ++);
@@ -311,7 +311,7 @@ TEST(LazyList, ValidateLazyTail)
     size_t count = 0;
 	uint64_t items1[6];
 
-    auto l2(MakeTestLazyList(items1, count).tail().toList());
+    auto l2(MakeTestLazyList(items1, count).tail().done());
 
 	auto it = l2.begin();
 	EXPECT_EQ(0, count);
@@ -332,7 +332,7 @@ TEST(LazyList, Cons)
 {
 	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
 
-    auto l2(fl::lazy_from(items1).cons(10).toList());
+    auto l2(fl::lazy_from(items1).cons(10).done());
 
 	auto it = l2.begin();
     EXPECT_EQ(10, *it ++);
@@ -350,7 +350,7 @@ TEST(LazyList, ValidateLazyCons)
     size_t count = 0;
 	uint64_t items1[6];
 
-    auto l2(MakeTestLazyList(items1, count).cons(10).toList());
+    auto l2(MakeTestLazyList(items1, count).cons(10).done());
 
 	auto it = l2.begin();
     EXPECT_EQ(0, count);
@@ -375,7 +375,7 @@ TEST(LazyList, Filter)
 {
 	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
 
-    auto l2(fl::lazy_from(items1).filter([](uint64_t val) {return (val % 2) != 0;}).toList());
+    auto l2(fl::lazy_from(items1).filter([](uint64_t val) {return (val % 2) != 0;}).done());
 
 	auto it = l2.begin();
 	EXPECT_EQ(items1[1], *it ++);
@@ -388,7 +388,7 @@ TEST(LazyList, Map)
 {
 	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
 
-    auto l2(fl::lazy_from(items1).map([](uint64_t val) {return std::to_string(val);}).toList());
+    auto l2(fl::lazy_from(items1).map([](uint64_t val) {return std::to_string(val);}).done());
 
 	auto it = l2.begin();
     EXPECT_EQ(std::string("0"), *it ++);
@@ -404,8 +404,8 @@ TEST(LazyList, Zip)
 {
 	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
 
-    auto l1(fl::lazy_from(items1).toList());
-    auto l2(fl::lazy_from(l1).zip(l1, [](uint64_t v1, uint64_t v2) {return v1 * v2;}).toList());
+    auto l1(fl::lazy_from(items1).done());
+    auto l2(fl::lazy_from(l1).zip(l1, [](uint64_t v1, uint64_t v2) {return v1 * v2;}).done());
 
 	auto it = l2.begin();
     EXPECT_EQ(0, *it ++);
@@ -419,8 +419,8 @@ TEST(LazyList, Zip)
 
 TEST(LazyList, ZipLazySequence)
 {
-    auto l1(fl::lazy_sequence<uint64_t>(6).toList());
-    auto l2(fl::lazy_from(l1).zip(l1, [](uint64_t v1, uint64_t v2) {return v1 * v2;}).toList());
+    auto l1(fl::lazy_sequence<uint64_t>(6).done());
+    auto l2(fl::lazy_from(l1).zip(l1, [](uint64_t v1, uint64_t v2) {return v1 * v2;}).done());
 
 	auto it = l2.begin();
     EXPECT_EQ(0, *it ++);
@@ -434,7 +434,7 @@ TEST(LazyList, ZipLazySequence)
 
 TEST(LazyList, ZipSelfLazySequence)
 {
-    auto l2(fl::lazy_sequence<uint64_t>(6).zip_self([](uint64_t v1, uint64_t v2) {return v1 * v2;}).toList());
+    auto l2(fl::lazy_sequence<uint64_t>(6).zip_self([](uint64_t v1, uint64_t v2) {return v1 * v2;}).done());
 
 	auto it = l2.begin();
     EXPECT_EQ(0, *it ++);

@@ -40,8 +40,8 @@ public:
 
     pointer operator->() const
     {
-        current->construct(*iterating_list);
-        return &current->dereference();
+        current->Construct(*iterating_list->m_constructor.get());
+        return &current->Dereference();
     }
 
     this_type& operator ++()

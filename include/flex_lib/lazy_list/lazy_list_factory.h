@@ -40,6 +40,12 @@ auto lazy_from(C &cont) -> decltype(lazy_from<typename C::iterator>(cont.begin()
     return lazy_from(cont.begin(), cont.end());
 }
 
+template<typename C>
+auto lazy_from(const C &cont) -> decltype(lazy_from<typename C::const_iterator>(cont.begin(), cont.end()))
+{
+    return lazy_from(cont.begin(), cont.end());
+}
+
 template<typename Gen>
 auto lazy_generate(Gen &&gen)
 {

@@ -41,12 +41,7 @@ public:
         return *this;
     }
     
-    Gen &getGenerator()
-    {
-        return m_gen;
-    }
-    
-    lazy_list<VT> toList()
+    lazy_list<VT> done()
     {
         typedef LazyListConstructorBase<VT> ConstructorBase;
         typedef LazyListConstructor<VT, Gen> Constructor;
@@ -55,7 +50,18 @@ public:
         return lazy_list<VT>(std::static_pointer_cast<ConstructorBase>(ctor));
     }
     
-    auto tail() &&
+    operator lazy_list<VT>()
+    {
+        return done();
+    }
+    
+    template<typename VT1, typename = std::enable_if_t<!std::is_same_v<VT, VT1>>>
+    operator lazy_list<VT1>()
+    {
+        return map([](const VT &v) {return VT1(v);}).done();
+    }
+    
+    auto tail()
     {
         auto newGen = [is_first_time = true, gen = std::move(m_gen)](bool &isEos) mutable
         {
@@ -74,7 +80,7 @@ public:
     }
     
     template<typename U>
-    auto cons(const U& val) &&
+    auto cons(const U& val)
     {
         auto newGen = [is_first_time = true, gen = std::move(m_gen), val](bool &isEos) mutable
         {
@@ -91,9 +97,9 @@ public:
     }
     
     template<typename Fn>
-    auto filter(Fn filter) &&
+    auto filter(Fn &&filter)
     {
-        auto newGen = [filter, gen = std::move(m_gen)](bool &isEos) mutable
+        auto newGen = [filter = std::forward<Fn>(filter), gen = std::move(m_gen)](bool &isEos) mutable
         {
             do
             {
@@ -110,11 +116,11 @@ public:
     }
     
     template<typename Fn>
-    auto map(Fn mapper) &&
+    auto map(Fn &&mapper)
     {
         typedef std::decay_t<decltype(mapper(VT()))> MVT;
         
-        auto newGen = [mapper, gen = std::move(m_gen)](bool &isEos) mutable
+        auto newGen = [mapper = std::forward<Fn>(mapper), gen = std::move(m_gen)](bool &isEos) mutable
         {
             auto val = gen(isEos);
             if (!isEos)
@@ -127,11 +133,11 @@ public:
     }
     
     template<typename VT2, typename Fn>
-    auto zip(const lazy_list<VT2> &l2, Fn zipper) &&
+    auto zip(const lazy_list<VT2> &l2, Fn &&zipper)
     {
         typedef std::decay_t<decltype(zipper(VT(), VT2()))> ZVT;
         
-        auto newGen = [zipper, b = l2.begin(), e = l2.end(), gen = std::move(m_gen)](bool &isEos) mutable
+        auto newGen = [zipper = std::forward<Fn>(zipper), b = l2.begin(), e = l2.end(), gen = std::move(m_gen)](bool &isEos) mutable
         {
             if (b != e)
             {
@@ -150,11 +156,11 @@ public:
     }    
     
     template<typename Fn>
-    auto zip_self(Fn zipper) &&
+    auto zip_self(Fn &&zipper)
     {
         typedef std::decay_t<decltype(zipper(VT(), VT()))> ZVT;
         
-        auto newGen = [zipper, gen = std::move(m_gen)](bool &isEos) mutable
+        auto newGen = [zipper = std::forward<Fn>(zipper), gen = std::move(m_gen)](bool &isEos) mutable
         {
             auto v = gen(isEos);
             if (!isEos)
