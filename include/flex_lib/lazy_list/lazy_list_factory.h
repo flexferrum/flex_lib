@@ -2,58 +2,53 @@
 #define FLEX_LIB_LAZY_LIST_FACTORY_H
 
 #include "common.h"
+#include "lazy_list_builder.h"
 #include <functional>
 #include <type_traits>
+#include <iterator>
 
 namespace flex_lib
 {
+#if 0
 namespace detail
 {
 template<typename VT, typename It>
 auto make_rangebased_llist(It from, It to) -> lazy_list<VT>
 {
     auto ctor = lazy_list_constructor<VT, false>{
-        [from, to](VT& val) mutable -> bool
+        [from, to](bool &isFinal) mutable
         {
             if (from == to)
-                return false;
+            {
+                isFinal = true;
+                return VT();
+            }
  
-            val = *from;
-            ++ from;
-            return true;
+            return *(from ++);
         }
      };
     return lazy_list<VT>(std::move(ctor));
 }
 
 
-template<typename VT, typename FT>
-struct IsLazyEvaluator
-{
-    typedef typename lazy_list_constructor<VT, true>::NodeEvaluator NodeEvaluator;
-    
-    template<typename U>
-    static auto Test(U *fn) -> decltype((*fn)(*(NodeEvaluator*)nullptr));
-    static void Test(...);
-    
-    enum {value = !std::is_same<decltype(Test((FT*)nullptr)), void>::value};
-};
-
-
-template<typename VT, typename FT>
-struct IsValueEvaluator
+template<typename VT, typename FT, bool isLazy>
+struct IsNodeEvaluator
 {
     template<typename U>
-    static auto Test(U *fn) -> decltype((*fn)(*(VT*)nullptr));
-    static void Test(...);
-    
-    enum {value = !std::is_same<decltype(Test((FT*)nullptr)), void>::value};
+    static auto GetResult(U *fn, bool *b) -> decltype((*fn)(*b));
+    static void GetResult(...);
+
+    typedef typename lazy_list_constructor<VT, isLazy>::NodeIniter NodeIniter;
+    typedef decltype(GetResult((FT*)nullptr, nullptr)) FTResult;
+    typedef decltype(GetResult((NodeIniter*)nullptr, nullptr)) NIResult;
+
+    enum {value = std::is_same_v<NIResult, FTResult>/*::value*/};
 };
 
 template<typename VT, typename FT>
 struct FunctionTypeTest
 {
-    enum {value = IsLazyEvaluator<VT, FT>::value || IsValueEvaluator<VT, FT>::value};
+    enum {value = IsNodeEvaluator<VT, FT, false>::value || IsNodeEvaluator<VT, FT, true>::value};
 };
 
 }
@@ -89,12 +84,53 @@ auto make_llist(const C &cont) -> decltype(detail::make_rangebased_llist<typenam
 }
 
 template<typename VT, typename FT>
-typename std::enable_if<detail::FunctionTypeTest<VT, FT>::value, lazy_list<VT>>::type  make_llist(FT && fn)
+std::enable_if_t<detail::FunctionTypeTest<VT, FT>::value, lazy_list<VT>> make_llist(FT && fn)
 {
-    auto ctor = lazy_list_constructor<VT, detail::IsLazyEvaluator<VT, FT>::value>{
-        std::move(fn)
+    auto ctor = lazy_list_constructor<VT, detail::IsNodeEvaluator<VT, FT, true>::value>{
+        std::forward<FT>(fn)
      };
     return lazy_list<VT>(std::move(ctor));    
+}
+#endif
+
+
+template<typename It>
+auto lazy_from(It b, It e)
+{
+    typedef typename std::iterator_traits<It>::value_type VT;
+    // typedef typename It::value_type VT;
+    auto gen = [b, e](bool &isEos) mutable
+    {
+        if (b == e)
+        {
+            isEos = true;
+            return VT();
+        }
+        
+        return *b ++;
+    };
+    
+    return detail::MakeLazyListBuilder<VT>(std::move(gen));
+}
+
+template<typename VT, size_t SZ>
+auto lazy_from(VT (&items)[SZ])
+{
+    auto first = &items[0];
+    return lazy_from(first, first + SZ);
+}
+
+template<typename C>
+auto lazy_from(C &cont) -> decltype(lazy_from<typename C::iterator>(cont.begin(), cont.end()))
+{
+    return lazy_from(cont.begin(), cont.end());
+}
+
+template<typename Gen>
+auto lazy_generate(Gen &&gen)
+{
+    typedef std::decay_t<decltype(gen(*(bool*)nullptr))> VT;
+    return detail::MakeLazyListBuilder<VT>(std::forward<Gen>(gen));
 }
 }
 

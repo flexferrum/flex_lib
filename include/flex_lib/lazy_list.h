@@ -5,6 +5,7 @@
 #include "lazy_list/lazy_list_impl.h"
 #include "lazy_list/lazy_list_iterator.h"
 #include "lazy_list/lazy_list_factory.h"
+#include "lazy_list/lazy_list_ops.h"
 
 #include <algorithm>
 #include <iostream>

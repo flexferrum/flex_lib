@@ -17,13 +17,25 @@ public:
     typedef typename LL::value_type const*              pointer;
     typedef typename LL::value_type const&              reference;
 
+    // TODO: Copy and default constructors
+
     lazy_list_iterator(LL const& list) : iterating_list(&list), is_end(true) {;}
+    lazy_list_iterator(const this_type &other) = default;
+    lazy_list_iterator(this_type &&other)
+        : iterating_list(other.iterating_list)
+        , current(std::move(other.current))
+        , is_end(other.is_end)
+    {
+        other.iterating_list = nullptr;
+        other.is_end = true;
+    }
+
     lazy_list_iterator(LL const& list, inner_iterator it) : iterating_list(&list), current(it), is_end(false) {;}
 
     reference operator*() const
     {
-        current->construct(*iterating_list);
-        return current->dereference();
+        current->Construct(*iterating_list->m_constructor.get());
+        return current->Dereference();
     }
 
     pointer operator->() const
@@ -34,19 +46,19 @@ public:
 
     this_type& operator ++()
     {
-        if (current->is_final_node)
+        if (current->m_isFinalNode)
             return *this;
 
         inner_iterator it = current ++;
-        if (current == iterating_list->inner_list.end() || !current->is_constructed)
+        if (current == iterating_list->m_constructor->m_items.end() || !current->m_isConstructed)
         {
-            if (current != iterating_list->inner_list.end())
+            if (current != iterating_list->m_constructor->m_items.end())
             {
-                current->construct(*iterating_list);
+                current->Construct(*iterating_list->m_constructor.get());
             }
             else
             {
-                it->construct(*iterating_list);
+                it->Construct(*iterating_list->m_constructor.get());
                 current = ++ it;
             }
         }
@@ -71,14 +83,14 @@ public:
             if (other.iterating_list != iterating_list)
                 return false;
 
-            if (!other.current->is_constructed)
-                other.current->construct(*iterating_list);
+            if (!other.current->m_isConstructed)
+                other.current->Construct(*iterating_list->m_constructor.get());
 
-            return other.current->is_final_node;
+            return other.current->m_isFinalNode;
         }
 
-        if (!current->is_constructed)
-            current->construct(*iterating_list);
+        if (!current->m_isConstructed)
+            current->Construct(*iterating_list->m_constructor.get());
 
         if (other.is_end)
             return other == *this;
@@ -115,7 +127,6 @@ private:
     bool is_end;
 };
 
-// #include "lazy_list.inl.h"
 
 }
 

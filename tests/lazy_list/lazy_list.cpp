@@ -4,8 +4,57 @@
 
 #include <flex_lib/config/config.h>
 #include <flex_lib/lazy_list.h>
+#include <boost/optional.hpp>
 
 typedef flex_lib::lazy_list<uint64_t> TestLazyList;
+
+template<typename T>
+class LazyNode
+{
+public:
+    typedef std::function<T ()> generator_type;
+    typedef LazyNode<T> this_type;
+    
+    LazyNode()
+    {
+        ;
+    }
+    
+    LazyNode(const generator_type &gen)
+        : m_generator(gen)
+    {
+        ;
+    }
+    
+    LazyNode(generator_type &&gen)
+        : m_generator(std::move(gen))
+    {
+        ;
+    }
+    
+    T & operator *()
+    {
+        Dereference();
+        return m_val.get();
+    }
+    
+    const T & operator *() const
+    {
+        Dereference();
+        return m_val.get();
+    }    
+private:
+    void Dereference() const
+    {
+        if (m_val.is_initialized())
+            return;
+        
+        m_val = m_generator();
+    }
+    
+    mutable boost::optional<T> m_val;
+    std::function<T ()> m_generator;
+};
 
 TEST(LazyList, EmptyList)
 {
@@ -18,7 +67,7 @@ TEST(LazyList, SequencePtrInit)
 {
 	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
 
-	TestLazyList l1 = fl::make_llist(std::begin(items1), std::end(items1));
+	TestLazyList l1 = fl::lazy_from(std::begin(items1), std::end(items1)).toList();
 	EXPECT_EQ(sizeof(items1) / sizeof(items1[0]), l1.size());
 
 	auto it = l1.begin();
@@ -35,7 +84,7 @@ TEST(LazyList, SequenceArrayInit)
 {
 	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
 
-	TestLazyList l1 = fl::make_llist(items1);
+	TestLazyList l1 = fl::lazy_from(items1).toList();
 	EXPECT_EQ(sizeof(items1) / sizeof(items1[0]), l1.size());
 
 	auto it = l1.begin();
@@ -52,7 +101,7 @@ TEST(LazyList, SequenceIteratorInit)
 {
 	std::vector<uint64_t> items1{0, 1, 2, 3, 4, 5};
 
-    TestLazyList l1 = fl::make_llist(items1.begin(), items1.end());
+    TestLazyList l1 = fl::lazy_from(items1.begin(), items1.end()).toList();
     EXPECT_EQ(items1.size(), l1.size());
 
 	auto it = l1.begin();
@@ -69,7 +118,7 @@ TEST(LazyList, SequenceContainerInit)
 {
 	std::vector<uint64_t> items1{0, 1, 2, 3, 4, 5};
 
-    TestLazyList l1 = fl::make_llist(items1);
+    TestLazyList l1 = fl::lazy_from(items1).toList();
     EXPECT_EQ(items1.size(), l1.size());
 
 	auto it = l1.begin();
@@ -84,20 +133,21 @@ TEST(LazyList, SequenceContainerInit)
 
 TEST(LazyList, FunctorInit)
 {
-	int count = 0;
+    uint64_t count = 0;
 	uint64_t items1[6];
-	auto ftor = [&count, &items1](uint64_t& val) -> bool
+    auto ftor = [&count, &items1](bool& isEnd)
 	{
-		if (count == 6)
-            return false;
+        if (count == 6)
+        {
+            isEnd = true;
+            return 0ull;
+        }
 
-        int next_val = count ++;
-		items1[next_val] = next_val;
-		val = next_val;
-        return true;
+        uint64_t next_val = count ++;
+        return items1[next_val] = next_val;
 	};
 
-    TestLazyList l1 = fl::make_llist<uint64_t>(std::move(ftor));
+    TestLazyList l1 = fl::lazy_generate(std::move(ftor)).toList();
 	EXPECT_EQ(6, l1.size());
 
 	auto it = l1.begin();
@@ -111,22 +161,29 @@ TEST(LazyList, FunctorInit)
 	EXPECT_EQ(6, count);
 }
 
+template<typename T, size_t N>
+auto MakeTestLazyList(T (&items)[N], size_t &counter)
+{  
+    return fl::lazy_generate(
+    [&counter, &items](bool &isEos) -> T
+    {
+        if (counter == N)
+        {
+            isEos = true;
+            return T();
+        }
+        
+        auto next_val = counter ++;
+        return items[next_val] = next_val;
+    });   
+}
+
 TEST(LazyList, LazyFunctorInit)
 {
-	int count = 0;
+	size_t count = 0;
 	uint64_t items1[6];
-	auto ftor = [&count, &items1](std::function<uint64_t()>& fn) -> bool
-	{
-		if (count == 6)
-            return false;
 
-        int next_val = count ++;
-		items1[next_val] = next_val;
-        fn = [next_val]() {return next_val;};
-        return true;
-	};
-
-    TestLazyList l1 = fl::make_llist<uint64_t>(std::move(ftor));
+    auto l1(MakeTestLazyList(items1, count).toList());
 	EXPECT_EQ(6, l1.size());
 
 	auto it = l1.begin();
@@ -142,20 +199,10 @@ TEST(LazyList, LazyFunctorInit)
 
 TEST(LazyList, ValidateLazy1)
 {
-	int count = 0;
+    size_t count = 0;
 	uint64_t items1[6];
-	auto ftor = [&count, &items1](std::function<uint64_t ()>& eval) mutable -> bool
-	{
-		if (count == 6)
-            return false;
 
-        int next_val = count ++;
-		items1[next_val] = next_val;
-		eval = [next_val](){return next_val;};
-        return true;
-	};
-
-	TestLazyList l1 = fl::make_llist<uint64_t>(std::move(ftor));
+    auto l1(MakeTestLazyList(items1, count).toList());
 
 	auto it = l1.begin();
 	EXPECT_EQ(0, count);
@@ -179,66 +226,67 @@ TEST(LazyList, ValidateLazy2)
 	int count = 0;
 	int inner_count = 0;
 	uint64_t items1[6];
-	auto ftor = [&count, &items1, &inner_count](std::function<uint64_t ()>& eval) mutable -> bool
+    auto ftor = [&count, &items1, &inner_count](bool &isEnd)
 	{
 		if (count == 6)
-            return false;
+        {
+            isEnd = true;
+            return LazyNode<uint64_t>([] {return 0;});
+        }
 
         int next_val = count ++;
 		int& ic = inner_count;
 		items1[next_val] = next_val;
-		eval = [next_val, &ic]() -> uint64_t {++ ic; return next_val;};
-        return true;
+        return LazyNode<uint64_t>([next_val, &ic]() -> uint64_t {++ ic; return next_val;});
 	};
 
-    TestLazyList l1 = fl::make_llist<uint64_t>(std::move(ftor));
+    auto l1 = fl::lazy_generate(std::move(ftor)).toList();
 
 	auto it = l1.begin();
 	EXPECT_EQ(0, count);
 	EXPECT_EQ(0, inner_count);
-	EXPECT_EQ(items1[0], *it);
+	EXPECT_EQ(items1[0], **it);
 	EXPECT_EQ(1, count);
 	EXPECT_EQ(1, inner_count);
 	++ it;
 	EXPECT_EQ(1, inner_count);
 	EXPECT_EQ(2, count);
-	EXPECT_EQ(items1[1], *it);
+	EXPECT_EQ(items1[1], **it);
 	EXPECT_EQ(2, count);
 	EXPECT_EQ(2, inner_count);
 	++ it;
 	EXPECT_EQ(2, inner_count);
 	EXPECT_EQ(3, count);
-	EXPECT_EQ(items1[2], *it);
+	EXPECT_EQ(items1[2], **it);
 	EXPECT_EQ(3, count);
 	EXPECT_EQ(3, inner_count);
 	++ it;
 	EXPECT_EQ(3, inner_count);
 	EXPECT_EQ(4, count);
-	EXPECT_EQ(items1[3], *it);
+	EXPECT_EQ(items1[3], **it);
 	EXPECT_EQ(4, count);
 	EXPECT_EQ(4, inner_count);
 	++ it;
 	EXPECT_EQ(4, inner_count);
 	EXPECT_EQ(5, count);
-	EXPECT_EQ(items1[4], *it);
+	EXPECT_EQ(items1[4], **it);
 	EXPECT_EQ(5, count);
 	EXPECT_EQ(5, inner_count);
 	++ it;
 	EXPECT_EQ(5, inner_count);
 	EXPECT_EQ(6, count);
-	EXPECT_EQ(items1[5], *it);
+	EXPECT_EQ(items1[5], **it);
 	EXPECT_EQ(6, count);
 	++ it;
 	EXPECT_TRUE(it == l1.end());
 	EXPECT_EQ(6, inner_count);
 }
 
-#if 0
 TEST(LazyList, Head)
 {
 	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
 
-	TestLazyList l1(std::begin(items1), std::end(items1));
+    auto l1(fl::lazy_from(items1).toList());
 
 	EXPECT_EQ(items1[0], l1.head());
 }
@@ -247,8 +295,7 @@ TEST(LazyList, Tail)
 {
 	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
 
-	TestLazyList l1(std::begin(items1), std::end(items1));
-	auto l2 = l1.tail();
+    auto l2(fl::lazy_from(items1).tail().toList());
 
 	auto it = l2.begin();
 	EXPECT_EQ(items1[1], *it ++);
@@ -261,22 +308,10 @@ TEST(LazyList, Tail)
 
 TEST(LazyList, ValidateLazyTail)
 {
-	int count = 0;
+    size_t count = 0;
 	uint64_t items1[6];
-	auto ftor = [&count, &items1](bool& isEOS) mutable -> std::function<uint64_t ()>
-	{
-		if (count == 6)
-		{
-			isEOS = true;
-			return std::function<uint64_t ()>();
-		}
-		int next_val = count ++;
-		items1[next_val] = next_val;
-		return [next_val](){return next_val;};
-	};
 
-	TestLazyList l1(std::move(ftor));
-	auto l2 = l1.tail();
+    auto l2(MakeTestLazyList(items1, count).tail().toList());
 
 	auto it = l2.begin();
 	EXPECT_EQ(0, count);
@@ -292,7 +327,50 @@ TEST(LazyList, ValidateLazyTail)
 	EXPECT_TRUE(it == l2.end());
 	EXPECT_EQ(6, count);
 }
-#endif
+
+TEST(LazyList, Cons)
+{
+	uint64_t items1[] = {0, 1, 2, 3, 4, 5};
+
+    auto l2(fl::lazy_from(items1).cons(10).toList());
+
+	auto it = l2.begin();
+    EXPECT_EQ(10, *it ++);
+    EXPECT_EQ(items1[0], *it ++);
+	EXPECT_EQ(items1[1], *it ++);
+	EXPECT_EQ(items1[2], *it ++);
+	EXPECT_EQ(items1[3], *it ++);
+	EXPECT_EQ(items1[4], *it ++);
+	EXPECT_EQ(items1[5], *it ++);
+	EXPECT_TRUE(it == l2.end());
+}
+
+
+TEST(LazyList, ValidateLazyCons)
+{
+    size_t count = 0;
+	uint64_t items1[6];
+
+    auto l2(MakeTestLazyList(items1, count).cons(10).toList());
+
+	auto it = l2.begin();
+    EXPECT_EQ(0, count);
+	EXPECT_EQ(10, *it ++);
+    EXPECT_EQ(0, count);
+	EXPECT_EQ(items1[0], *it ++);
+	EXPECT_EQ(1, count);
+	EXPECT_EQ(items1[1], *it ++);
+	EXPECT_EQ(2, count);
+	EXPECT_EQ(items1[2], *it ++);
+	EXPECT_EQ(3, count);
+	EXPECT_EQ(items1[3], *it ++);
+	EXPECT_EQ(4, count);
+	EXPECT_EQ(items1[4], *it ++);
+	EXPECT_EQ(5, count);
+	EXPECT_EQ(items1[5], *it ++);
+	EXPECT_TRUE(it == l2.end());
+	EXPECT_EQ(6, count);
+}
 
 int main(int argc, char* argv[])
 {
