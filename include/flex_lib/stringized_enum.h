@@ -97,6 +97,12 @@ namespace detail
 		return flex_lib::detail::FindEnumEntryForString(strings_map, str); \
 	} \
 
+#if defined(Q_CREATOR_RUN)
+#define FL_STRINGIZED_ENUM(EnumName, EnumItems) enum EnumName {EnumItems}
+#define FL_ENUM_ENTRY(EnumEntry) EnumEntry,
+#define FL_ENUM_SPEC_ENTRY(EnumEntry, Id) EnumEntry = Id,
+#else
+
 #define FL_STRINGIZED_ENUM(EnumName, EnumItems) \
 	typedef char EnumName ## _StringMap_CharType; \
 	FL_DECLARE_ENUM(EnumName, EnumItems) \
@@ -110,5 +116,6 @@ namespace detail
 #define FL_ENUM_ENTRY(EnumEntry) ((EnumEntry, BOOST_PP_EMPTY(), #EnumEntry))
 #define FL_ENUM_NAMED_ENTRY(EnumEntry, EnumEntryName) ((EnumEntry, BOOST_PP_EMPTY(), EnumEntryName))
 #define FL_ENUM_SPEC_ENTRY(EnumEntry, Id) ((EnumEntry, = Id, #EnumEntry))
+#endif
 
 #endif // FLEX_LIB_STRINGIZED_ENUM_H__
