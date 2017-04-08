@@ -36,6 +36,7 @@ include_directories(
     )
 
 add_subdirectory(sources)
+add_subdirectory(tools)
 
 if (GTEST_INCLUDE_DIRS)
     add_subdirectory(tests)

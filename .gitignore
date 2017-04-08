@@ -1,0 +1,6 @@
+/*.db
+*.user
+*.user.*
+/flex_lib.pro
+/flex_lib.suo
+*.astdump
