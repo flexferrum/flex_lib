@@ -1,1 +1,1 @@
-add_subdirectory(codgen)
+add_subdirectory(codegen)

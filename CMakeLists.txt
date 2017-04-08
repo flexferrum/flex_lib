@@ -4,23 +4,37 @@ list (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 include(collect_sources)
 
-if(NOT "${GTest_DIR}" STREQUAL "")
-    list (APPEND CMAKE_PREFIX_PATH $ENV{GTest_DIR})
-    message(STATUS "GTest library search path: $ENV{GTest_DIR}")
+set(GTEST_ROOT $ENV{GTEST_DIR} CACHE PATH "Path to GTest/GMock library root")
+set(BOOST_ROOT $ENV{BOOST_DIR} CACHE PATH "Path to boost library root")
+set(FLEXLIB_BUILD_CODEGEN OFF CACHE BOOL "Build codegenerator tools")
+set(FLEXLIB_CXX_STANDARD "14" CACHE STRING "C++ standard conformance for library build")
+
+if(NOT "${GTEST_ROOT}" STREQUAL "")
+    list (APPEND CMAKE_PREFIX_PATH ${GTEST_ROOT})
+    message(STATUS "GTest library search path: ${GTEST_ROOT}")
 endif()
 
 
-if(NOT "${Boost_DIR}" STREQUAL "")
-    list (APPEND CMAKE_PREFIX_PATH $ENV{Boost_DIR})
-    message(STATUS "BOOST library search path: $ENV{Boost_DIR}")
+if(NOT "${BOOST_ROOT}" STREQUAL "")
+    list (APPEND CMAKE_PREFIX_PATH ${BOOST_ROOT})
+    message(STATUS "BOOST library search path: ${BOOST_ROOT}")
 endif()
 
 find_package(GTest)
 find_package(Boost)
 
+message (STATUS "##### COMPILER = ${CMAKE_CXX_COMPILER_ID}")
+message (STATUS "##### COMPILER = ${CMAKE_CXX_COMPILER_VERSION}")
+
 if (${CMAKE_CXX_COMPILER_ID} MATCHES "Clang" OR ${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
-endif ()
+    if (${FLEXLIB_CXX_STANDARD} STREQUAL "17" OR ${FLEXLIB_CXX_STANDARD} STREQUAL "1z")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+        message(STATUS "FlexLib is building with C++17 enabled")
+    else()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+        message(STATUS "FlexLib is building with C++14 enabled")
+    endif()
+endif()
 
 CollectSources(FlexLibSources FlexLibHeaders ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
@@ -36,8 +50,13 @@ include_directories(
     )
 
 add_subdirectory(sources)
-add_subdirectory(tools)
+if (FLEXLIB_BUILD_CODEGEN)
+    add_subdirectory(tools)
+endif()
 
 if (GTEST_INCLUDE_DIRS)
     add_subdirectory(tests)
 endif ()
+
+install (DIRECTORY include/ DESTINATION include)
+install (DIRECTORY cmake/ DESTINATION cmake)
