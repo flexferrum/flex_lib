@@ -34,6 +34,8 @@ target_link_libraries(${CODEGEN_BIN_NAME}
     clangTooling
     )
 
+add_subdirectory(test)
+
 install(TARGETS ${CODEGEN_BIN_NAME}
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib

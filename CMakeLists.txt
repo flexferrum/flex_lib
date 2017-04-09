@@ -11,13 +11,15 @@ set(FLEXLIB_CXX_STANDARD "14" CACHE STRING "C++ standard conformance for library
 
 if(NOT "${GTEST_ROOT}" STREQUAL "")
     list (APPEND CMAKE_PREFIX_PATH ${GTEST_ROOT})
-    message(STATUS "GTest library search path: ${GTEST_ROOT}")
+    set (Gtest_DIR ${GTEST_ROOT})
+    message(STATUS "GTest library search path: ${Gtest_DIR}")
 endif()
 
 
 if(NOT "${BOOST_ROOT}" STREQUAL "")
     list (APPEND CMAKE_PREFIX_PATH ${BOOST_ROOT})
-    message(STATUS "BOOST library search path: ${BOOST_ROOT}")
+    set (Boost_DIR ${GTEST_ROOT})
+    message(STATUS "BOOST library search path: ${Boost_DIR}")
 endif()
 
 find_package(GTest)

@@ -31,7 +31,7 @@ struct EnumDescriptor
     // Enumeration name
     std::string enumName;
     // Is enum item needs scope specifier or not
-    bool isScoped;
+    bool isScoped = false;
     // Collection of enum items
     std::vector<std::string> enumItems;
 };
@@ -90,7 +90,8 @@ void WriteEnumFromStringConversion(std::ostream& os, const EnumDescriptor& enumD
     auto& enumName = enumDescr.enumName;
     auto scopePrefix = enumDescr.isScoped ? enumName + "::" : std::string();
     
-    // Implement conversion via sorted array and lower_bound search algorithm
+    // Implement conversion via sorted array of paris 'string -> enum item'
+    // and std::lower_bound search algorithm
     os << "inline " << enumName << " StringTo" << enumName << "(const char* itemName)\n";
     os << "{\n";
     os << "    static std::pair<const char*, " << enumName << "> items[] = {\n";
@@ -112,34 +113,40 @@ void WriteEnumFromStringConversion(std::ostream& os, const EnumDescriptor& enumD
 )";
 }
 
+// Handler of the results of MatchFinder
 class EnumHandler : public clang::ast_matchers::MatchFinder::MatchCallback
 {
 public:
-   void run(const clang::ast_matchers::MatchFinder::MatchResult& result) override
-   {
-       if (const clang::EnumDecl* decl = result.Nodes.getNodeAs<clang::EnumDecl>("enum"))
-       {
-           ProcessEnum(decl);
-       }
-   }
-   
-   auto& GetFoundEnums() const {return m_foundEnums;}
-  
+    // Method is invoked when new enum declaration found in the input file
+    void run(const clang::ast_matchers::MatchFinder::MatchResult& result) override
+    {
+        if (const clang::EnumDecl* decl = result.Nodes.getNodeAs<clang::EnumDecl>("enum"))
+        {
+            ProcessEnum(decl);
+        }
+    }
+    
+    auto& GetFoundEnums() const {return m_foundEnums;}
+    
 private:
-   std::vector<EnumDescriptor> m_foundEnums;
-   
-   void ProcessEnum(const clang::EnumDecl* decl)
-   {
-       EnumDescriptor descriptor;
-       descriptor.enumName = decl->getName();
-       descriptor.isScoped = decl->isScoped();
-       
-       for (auto itemDecl : decl->enumerators())
-           descriptor.enumItems.push_back(itemDecl->getName());
-       
-       std::sort(descriptor.enumItems.begin(), descriptor.enumItems.end());
-       m_foundEnums.push_back(std::move(descriptor));       
-   }
+    // Collection of the found enum declaration
+    std::vector<EnumDescriptor> m_foundEnums;
+    
+    void ProcessEnum(const clang::EnumDecl* decl)
+    {
+        EnumDescriptor descriptor;
+        // Get name of the found enum
+        descriptor.enumName = decl->getName();
+        // Get 'isScoped' flag
+        descriptor.isScoped = decl->isScoped();
+        
+        // Get enum items
+        for (auto itemDecl : decl->enumerators())
+            descriptor.enumItems.push_back(itemDecl->getName());
+        
+        std::sort(descriptor.enumItems.begin(), descriptor.enumItems.end());
+        m_foundEnums.push_back(std::move(descriptor));       
+    }
 };
 
 int main(int argc, const char** argv)
@@ -147,9 +154,11 @@ int main(int argc, const char** argv)
     using namespace clang::tooling;
     using namespace clang::ast_matchers;
     
+    // Parse command line options and setup ClangTool
     CommonOptionsParser optionsParser(argc, argv, CodeGenCategory);
     ClangTool tool(optionsParser.getCompilations(), optionsParser.getSourcePathList());
     
+    // Setup declaration matcher and match finder
     DeclarationMatcher enumMatcher = 
             enumDecl(isExpansionInMainFile()).bind("enum");
     
@@ -157,6 +166,7 @@ int main(int argc, const char** argv)
     MatchFinder finder;
     finder.addMatcher(enumMatcher, &handler);
     
+    // Run tool for the specified input files
     auto result = tool.run(newFrontendActionFactory(&finder).get());
     if (result != 0)
         return result;
@@ -178,12 +188,16 @@ int main(int argc, const char** argv)
         fileHash = crcCalc.getCRC();
     }
     
-    // Write conversion functions to output file
+    // Write output file preamble
     WritePreamble(*targetOs, optionsParser.getSourcePathList(), fileHash);
+    // Write conversion functions to output file
     for (auto& descr : handler.GetFoundEnums())
     {
         WriteEnumToStringConversion(*targetOs, descr);
         WriteEnumFromStringConversion(*targetOs, descr);
     }
+    // Write output file postamble
     WritePostamble(*targetOs, fileHash);
+    
+    return 0;
 }
