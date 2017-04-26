@@ -13,6 +13,16 @@ include(ClangConfig)
 
 CollectSources(Sources Headers ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
+set (Boost_USE_STATIC_LIBS ON)
+find_package(Boost REQUIRED COMPONENTS iostreams)
+
+message (STATUS ">>>>##### COMPILER = ${CMAKE_CXX_COMPILER_ID}")
+
+if (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+    message(STATUS "CodeGenerator is compiled with enabled exceptions")
+endif()
+
 include_directories(
     ${CLANG_INCLUDE_DIRS}
     ${LLVM_INCLUDE_DIRS}
@@ -24,6 +34,10 @@ add_llvm_executable(${CODEGEN_BIN_NAME}
     ${Headers}
     )
 
+target_compile_options(${CODEGEN_BIN_NAME}
+  PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/EHsc>
+)
+
 target_link_libraries(${CODEGEN_BIN_NAME}
     clangAST
     clangBasic
@@ -32,6 +46,7 @@ target_link_libraries(${CODEGEN_BIN_NAME}
     clangRewriteFrontend
     clangStaticAnalyzerFrontend
     clangTooling
+    ${Boost_LIBRARIES}
     )
 
 add_subdirectory(test)

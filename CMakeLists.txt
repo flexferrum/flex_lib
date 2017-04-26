@@ -18,7 +18,7 @@ endif()
 
 if(NOT "${BOOST_ROOT}" STREQUAL "")
     list (APPEND CMAKE_PREFIX_PATH ${BOOST_ROOT})
-    set (Boost_DIR ${GTEST_ROOT})
+    set (Boost_DIR ${BOOST_ROOT})
     message(STATUS "BOOST library search path: ${Boost_DIR}")
 endif()
 
