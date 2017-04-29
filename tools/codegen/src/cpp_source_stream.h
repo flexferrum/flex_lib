@@ -4,6 +4,7 @@
 #include <iostream>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 
 #include <boost/iostreams/filtering_stream.hpp>
 
@@ -30,14 +31,7 @@ public:
     void ResetParams(const out::OutParams *params);
     
 private:
-    StreamController* m_controller;
-  
-    template<typename T>
-    struct TypeMapper {using type = CppSourceStream;};
-
-    template<typename T>
-    static auto StreamOperType(T&& val) -> typename TypeMapper<decltype(*((std::ostream*)nullptr) << val)>::type;
-    
+    StreamController* m_controller;    
     
     template<typename R>
     friend auto& operator << (CppSourceStream& stream, R (*manip)(CppSourceStream& stream))
@@ -46,7 +40,8 @@ private:
     }
     
     template<typename Val>
-    friend auto operator << (CppSourceStream& stream, Val&& val) -> decltype(StreamOperType(val))&
+    friend auto operator << (CppSourceStream& stream, Val&& val) 
+            -> std::enable_if_t<!std::is_convertible<decltype(stream << val), CppSourceStream&>::value, CppSourceStream&>
     {
         static_cast<boost::iostreams::filtering_ostream&>(stream) << std::forward<Val>(val);
         return stream;
@@ -145,22 +140,6 @@ inline auto scope_enter(const std::string& closer, int indent = 1)
         return s;
     });
 }
-
-//inline CppSourceStream& braced_scope(CppSourceStream& os)
-//{
-//    os << new_line << "{" << indent;
-//    os.EnterScope("}", -1);
-//    return os;
-//}
-
-//inline auto braced_scope(const std::string& closer)
-//{
-//    return detail::MakeManip([closer](CppSourceStream& s) -> CppSourceStream& {
-//        s << "{" << indent;
-//        s.EnterScope("}" + closer, -1);
-//        return s;
-//    });
-//}
 
 inline CppSourceStream& scope_exit(CppSourceStream& s)
 {
@@ -266,8 +245,8 @@ private:
 class BracedStreamScope : public StreamScope
 {
 public:
-    BracedStreamScope(std::string bracePrefix, std::string braceSuffix)
-        : StreamScope("\n{", "\n}" + braceSuffix, 1)
+    BracedStreamScope(std::string bracePrefix, std::string braceSuffix, int indent = 1)
+        : StreamScope("\n{", "\n}" + braceSuffix, indent)
         , m_bracePrefix(std::move(bracePrefix))
     {
     }

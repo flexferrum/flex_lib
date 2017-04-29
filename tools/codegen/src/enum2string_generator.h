@@ -2,6 +2,7 @@
 #define ENUM2STRING_GENERATOR_H
 
 #include "basic_generator.h"
+#include "decls_reflection.h"
 
 namespace codegen 
 {
@@ -21,21 +22,12 @@ protected:
     void WriteHeaderPostamble(CppSourceStream &hdrOs) override;
     
 private:
-    struct EnumDescriptor
-    {
-        // Enumeration name
-        std::string enumName;
-        // Is enum item needs scope specifier or not
-        bool isScoped = false;
-        // Collection of enum items
-        std::vector<std::string> enumItems;
-    };
 
-    void WriteEnumToStringConversion(CppSourceStream &hdrOs, const EnumDescriptor &enumDescr);
-    void WriteEnumFromStringConversion(CppSourceStream &hdrOs, const EnumDescriptor &enumDescr);
+    void WriteEnumToStringConversion(CppSourceStream &hdrOs, const reflection::EnumInfoPtr& enumDescr);
+    void WriteEnumFromStringConversion(CppSourceStream &hdrOs, const reflection::EnumInfoPtr& enumDescr);
 
 private:
-    std::vector<EnumDescriptor> m_foundEnums;        
+    reflection::NamespacesTree m_namespaces;
 };
 } // codegen
 

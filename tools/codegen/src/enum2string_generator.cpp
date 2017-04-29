@@ -1,5 +1,6 @@
 #include "enum2string_generator.h"
 #include "options.h"
+#include "ast_reflector.h"
 
 #include <clang/ASTMatchers/ASTMatchers.h>
 
@@ -30,18 +31,9 @@ void Enum2StringGenerator::HandleMatch(const clang::ast_matchers::MatchFinder::M
 {
     if (const clang::EnumDecl* decl = matchResult.Nodes.getNodeAs<clang::EnumDecl>("enum"))
     {
-        EnumDescriptor descriptor;
-        // Get name of the found enum
-        descriptor.enumName = decl->getName();
-        // Get 'isScoped' flag
-        descriptor.isScoped = decl->isScoped();
+        reflection::AstReflector reflector;
         
-        // Get enum items
-        for (auto itemDecl : decl->enumerators())
-            descriptor.enumItems.push_back(itemDecl->getName());
-        
-        std::sort(descriptor.enumItems.begin(), descriptor.enumItems.end());
-        m_foundEnums.push_back(std::move(descriptor));       
+        reflector.ReflectEnum(decl, m_namespaces, matchResult.Context);
     }    
 }
 
@@ -57,6 +49,7 @@ void Enum2StringGenerator::WriteHeaderPreamble(CppSourceStream &hdrOs)
     }
     
     // Necessary library files
+    hdrOs << "#include <flex_lib/stringized_enum.h>\n";
     hdrOs << "#include <algorithm>\n";
     hdrOs << "#include <utility>\n\n";
 }
@@ -66,32 +59,49 @@ void Enum2StringGenerator::WriteHeaderPostamble(CppSourceStream &hdrOs)
     hdrOs << out::scope_exit;
 }
 
+template<typename Fn>
+void WriteNamespaceContents(CppSourceStream &hdrOs, reflection::NamespaceInfoPtr ns, Fn&& fn)
+{
+    out::BracedStreamScope nsScope("namespace " + ns->name, "", 0);
+    if (!ns->isRootNamespace)
+        hdrOs << out::new_line << nsScope;
+    
+    fn(hdrOs, ns);
+    for (auto& inner : ns->innerNamespaces)
+        WriteNamespaceContents(hdrOs, inner, std::forward<Fn>(fn));
+}
+
 void Enum2StringGenerator::WriteHeaderContent(CppSourceStream &hdrOs)
 {
-    for (auto& enumInfo : m_foundEnums)
-    {
-        WriteEnumToStringConversion(hdrOs, enumInfo);
-        WriteEnumFromStringConversion(hdrOs, enumInfo);
-    }
+    WriteNamespaceContents(hdrOs, m_namespaces.GetRootNamespace(), [this](CppSourceStream &os, reflection::NamespaceInfoPtr ns) {
+        for (auto& enumInfo : ns->enums)
+        {
+            WriteEnumToStringConversion(os, enumInfo);
+            WriteEnumFromStringConversion(os, enumInfo);
+        }      
+    });
 }
 
 // Enum item to string conversion writer
-void Enum2StringGenerator::WriteEnumToStringConversion(CppSourceStream &hdrOs, const EnumDescriptor& enumDescr)
+void Enum2StringGenerator::WriteEnumToStringConversion(CppSourceStream &hdrOs, const reflection::EnumInfoPtr &enumDescr)
 {
+    std::string scopeName = enumDescr->scopeSpecifier;
+    std::string fullName =  scopeName + (scopeName.empty() ? "" : "::") + enumDescr->name;
     out::ScopedParams params(hdrOs, {
-        {"enumName", enumDescr.enumName},
-        {"prefix", enumDescr.isScoped ? enumDescr.enumName + "::" : std::string()}
+        {"enumName", enumDescr->name},
+        {"enumFullName", fullName},
+        {"prefix", enumDescr->isScoped ? fullName + "::" : scopeName + (scopeName.empty() ? "" : "::")}
     });
     
-    out::BracedStreamScope fnScope("inline const char* $enumName$ToString($enumName$ e)", "\n\n");
-    hdrOs << fnScope;
+    out::BracedStreamScope fnScope("inline const char* $enumName$ToString($enumFullName$ e)", "\n");
+    hdrOs << out::new_line << fnScope;
     {
         out::BracedStreamScope switchScope("switch (e)", "\n");
         hdrOs << out::new_line << switchScope;
         out::OutParams innerParams;
-        for (auto& i : enumDescr.enumItems)
+        for (auto& i : enumDescr->items)
         {
-            innerParams["itemName"] = i;
+            innerParams["itemName"] = i.itemName;
             hdrOs << out::with_params(innerParams)
                   << out::new_line(-1) << "case $prefix$$itemName$:"
                   << out::new_line << "return \"$itemName$\";";
@@ -101,35 +111,38 @@ void Enum2StringGenerator::WriteEnumToStringConversion(CppSourceStream &hdrOs, c
 }
 
 // String to enum conversion writer
-void Enum2StringGenerator::WriteEnumFromStringConversion(CppSourceStream &hdrOs, const EnumDescriptor& enumDescr)
+void Enum2StringGenerator::WriteEnumFromStringConversion(CppSourceStream &hdrOs, const reflection::EnumInfoPtr &enumDescr)
 {
+    std::string scopeName = enumDescr->scopeSpecifier;
+    std::string fullName =  scopeName + (scopeName.empty() ? "" : "::") + enumDescr->name;
     out::ScopedParams params(hdrOs, {
-        {"enumName", enumDescr.enumName},
-        {"prefix", enumDescr.isScoped ? enumDescr.enumName + "::" : std::string()}
+        {"enumName", enumDescr->name},
+        {"enumFullName", fullName},
+        {"prefix", enumDescr->isScoped ? fullName + "::" : scopeName + (scopeName.empty() ? "" : "::")}
     });
     
-    out::BracedStreamScope fnScope("inline $enumName$ StringTo$enumName$(const char* itemName)", "\n\n");
-    hdrOs << fnScope;
+    out::BracedStreamScope fnScope("inline $enumFullName$ StringTo$enumName$(const char* itemName)", "\n");
+    hdrOs << out::new_line << fnScope;
     {
-        out::BracedStreamScope itemsScope("static std::pair<const char*, $enumName$> items[] = ", ";\n");
+        out::BracedStreamScope itemsScope("static std::pair<const char*, $enumFullName$> items[] = ", ";\n");
         hdrOs << out::new_line << itemsScope;
 
         out::OutParams& innerParams = params.GetParams();
-        for (auto& i : enumDescr.enumItems)
+        auto items = enumDescr->items;
+        std::sort(begin(items), end(items), [](auto& i1, auto& i2) {return i1.itemName < i2.itemName;});
+        for (auto& i : items)
         {
-            innerParams["itemName"] = i;
-            hdrOs << out::new_line << "{\"$itemName$\", $prefix$$itemName$},";
+            innerParams["itemName"] = i.itemName;
+            hdrOs << out::with_params(innerParams) << out::new_line << "{\"$itemName$\", $prefix$$itemName$},";
         }    
     }
 
-    hdrOs << R"(
-    auto p = std::lower_bound(begin(items), end(items), itemName,
-                      [](auto&& i, auto&& v) {return strcmp(i.first, v) < 0;});
-    
-    if (p == end(items) || strcmp(p->first, itemName) != 0)
-        throw std::bad_cast();
-    
-    return p->second;)";
+    hdrOs << out::with_params(params.GetParams()) << R"(
+     $enumFullName$ result;
+     if (!flex_lib::detail::String2Enum(itemName, items, result))
+         flex_lib::bad_enum_name::Throw(itemName, "$enumName$");
+ 
+     return result;)";
 }
 } // codegen
 
