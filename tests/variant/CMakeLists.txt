@@ -9,6 +9,6 @@ add_executable(${PROJECT_NAME}
     ${Headers}
     )
 
-target_link_libraries(${PROJECT_NAME} ${GTEST_BOTH_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${GTEST_BOTH_LIBRARIES} flex_lib)
 
 add_test(${PROJECT_NAME} ${PROJECT_NAME})

@@ -31,9 +31,9 @@ void Enum2StringGenerator::HandleMatch(const clang::ast_matchers::MatchFinder::M
 {
     if (const clang::EnumDecl* decl = matchResult.Nodes.getNodeAs<clang::EnumDecl>("enum"))
     {
-        reflection::AstReflector reflector;
+        reflection::AstReflector reflector(matchResult.Context);
         
-        reflector.ReflectEnum(decl, m_namespaces, matchResult.Context);
+        reflector.ReflectEnum(decl, m_namespaces);
     }    
 }
 

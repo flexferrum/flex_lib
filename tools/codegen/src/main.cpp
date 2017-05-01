@@ -16,6 +16,7 @@
 using namespace llvm;
 
 extern codegen::GeneratorPtr CreateEnum2StringGen(const codegen::Options&);
+extern codegen::GeneratorPtr CreatePimplGen(const codegen::Options&);
 
 namespace
 {
@@ -33,6 +34,7 @@ cl::opt<codegen::GeneratorId> GenerationMode(cl::desc("Choose generation mode:")
 // cl::opt<std::string> OutputFilename("o", cl::desc("Specify output filename"), cl::value_desc("filename"), cl::cat(CodeGenCategory));
 cl::opt<std::string> OutputHeaderName("ohdr", cl::desc("Specify output header filename"), cl::value_desc("filename"), cl::cat(CodeGenCategory));
 cl::opt<std::string> OutputSourceName("osrc", cl::desc("Specify output source filename"), cl::value_desc("filename"), cl::cat(CodeGenCategory));
+cl::opt<std::string> FileToUpdateName("update", cl::desc("Specify source filename for code update"), cl::value_desc("filename"), cl::cat(CodeGenCategory));
 
 cl::opt<codegen::Standard> LangStandart("std", cl::desc("Choose the standard conformance for the generation results:"),
   cl::values(
@@ -50,7 +52,7 @@ cl::extrahelp MoreHelp("\nCode generation tool help text...");
 
 std::vector<std::pair<codegen::GeneratorId, codegen::GeneratorFactory>> GenFactories = {
     {codegen::GeneratorId::Enum2StringGen, CreateEnum2StringGen},
-    {codegen::GeneratorId::PimplGen, nullptr},    
+    {codegen::GeneratorId::PimplGen, CreatePimplGen},    
 };
 }
 

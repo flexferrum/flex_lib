@@ -40,13 +40,18 @@ endif()
 
 CollectSources(FlexLibSources FlexLibHeaders ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_library(FlexLibHeadersFakeLib EXCLUDE_FROM_ALL ${FlexLibHeaders})
-set_target_properties(FlexLibHeadersFakeLib PROPERTIES LINKER_LANGUAGE CXX)
+add_library(flex_lib_fake_sources EXCLUDE_FROM_ALL ${FlexLibHeaders})
+set_target_properties(flex_lib_fake_sources PROPERTIES LINKER_LANGUAGE CXX)
 
+add_library(flex_lib INTERFACE)
+target_include_directories(flex_lib
+    INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+
+set(FLEX_LIB_INCLUDE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/include")
 set(FLEX_LIB_INCLUDE_DIR "flex_lib")
 
 include_directories(
-    "./include"
     ${GTEST_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
     )
