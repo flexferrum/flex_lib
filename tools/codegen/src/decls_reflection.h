@@ -64,7 +64,7 @@ struct LocationInfo
 struct MethodParamInfo
 {
     std::string name;
-    TypeInfo type;
+    TypeInfoPtr type;
     std::string fullDecl;
     
     const clang::ParmVarDecl* decl;
@@ -84,7 +84,7 @@ struct MethodInfo : public NamedDeclInfo
     SourceLocation defLocation;
     std::vector<MethodParamInfo> params;
     std::string fullPrototype;
-    TypeInfo returnType;
+    TypeInfoPtr returnType;
     std::string returnTypeAsString;
     AccessType accessType = AccessType::Undefined;
     

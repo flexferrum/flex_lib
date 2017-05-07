@@ -40,7 +40,16 @@ void PimplGenerator::HandleMatch(const clang::ast_matchers::MatchFinder::MatchRe
         std::cout << "Methods: " << std::endl;
         
         for (auto mi : ci->methods)
+        {
             std::cout << mi->fullPrototype << std::endl;
+            std::cout << "Return type: " << mi->returnType->getPrintedName() << std::endl;
+            std::cout << "Params: ";
+            for (auto& pi : mi->params)
+            {
+                std::cout << pi.type->getPrintedName() << ", ";
+            }
+            std::cout << std::endl;
+        }
         // reflection::AstReflector reflector;
         
         // reflector.ReflectEnum(decl, m_namespaces, matchResult.Context);

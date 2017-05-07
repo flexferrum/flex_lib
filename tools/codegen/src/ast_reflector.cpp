@@ -1,6 +1,6 @@
 #include "ast_reflector.h"
-
-#include <clang/AST/PrettyPrinter.h>
+#include "ast_utils.h"
+#include "type_info.h"
 
 namespace reflection 
 {
@@ -15,43 +15,6 @@ auto FindExisting(const Cont& cont, const std::string& qualifiedName)
     
     
     return p == end(cont) ? Cont::value_type() : *p;
-}
-
-auto GetLocation(const clang::SourceLocation& loc, const ASTContext* context)
-{
-    SourceLocation result;
-    clang::PresumedLoc ploc = context->getSourceManager().getPresumedLoc(loc, false);
-    result.fileName = ploc.getFilename();
-    result.line = ploc.getLine();
-    result.column = ploc.getColumn();
-    
-    return result;
-}
-
-template<typename Decl>
-auto GetDeclLocation(const Decl* decl, const ASTContext* context)
-{
-    return GetLocation(decl->getLocation(), context); 
-}
-
-template<typename Decl>
-std::string DeclToString(const Decl* decl, const ASTContext* context)
-{
-    clang::PrintingPolicy policy(context->getLangOpts());
-    
-    policy.Bool = true;
-    policy.AnonymousTagLocations = false;
-    policy.SuppressUnwrittenScope = true;
-    policy.Indentation = 4;
-    policy.UseVoidForZeroParams = false;
-    
-    std::string result;
-    {
-        llvm::raw_string_ostream os(result);
-    
-        decl->print(os, policy);
-    }
-    return result;
 }
 
 AccessType ConvertAccessType(clang::AccessSpecifier access)
@@ -90,7 +53,7 @@ EnumInfoPtr AstReflector::ReflectEnum(const clang::EnumDecl *decl, NamespacesTre
 
     enumInfo = std::make_shared<EnumInfo>();
     enumInfo->decl = decl;
-    enumInfo->location = GetDeclLocation(decl, m_astContext);
+    enumInfo->location = GetLocation(decl, m_astContext);
     
     SetupNamedDeclInfo(decl, ns, enumInfo.get());
     
@@ -101,7 +64,7 @@ EnumInfoPtr AstReflector::ReflectEnum(const clang::EnumDecl *decl, NamespacesTre
         EnumItemInfo item;
         item.itemName = itemDecl->getNameAsString();
         item.itemValue = itemDecl->getInitVal().toString(10);
-        item.location = GetDeclLocation(itemDecl, m_astContext);
+        item.location = GetLocation(itemDecl, m_astContext);
         enumInfo->items.push_back(std::move(item));
     }
 
@@ -127,7 +90,7 @@ ClassInfoPtr AstReflector::ReflectClass(const CXXRecordDecl* decl, NamespacesTre
     classInfo->isAbstract = decl->isAbstract();
     classInfo->isTrivial = decl->isTrivial();
     classInfo->isUnion = decl->isUnion();
-    classInfo->location = GetDeclLocation(decl, m_astContext);
+    classInfo->location = GetLocation(decl, m_astContext);
     
     for (auto methodDecl : decl->methods())
     {
@@ -163,19 +126,22 @@ MethodInfoPtr AstReflector::ReflectMethod(const CXXMethodDecl* decl, NamespacesT
     methodInfo->isStatic = decl->isStatic();
     methodInfo->isVirtual = decl->isVirtual();
     methodInfo->accessType = ConvertAccessType(decl->getAccess());
-    methodInfo->fullPrototype = DeclToString(decl, m_astContext);
+    methodInfo->fullPrototype = EntityToString(decl, m_astContext);
     methodInfo->decl = decl;
+    methodInfo->returnType = TypeInfo::Create(decl->getReturnType(), m_astContext);
     
-    methodInfo->declLocation = GetDeclLocation(decl, m_astContext);
+    methodInfo->declLocation = GetLocation(decl, m_astContext);
     auto defDecl = decl->getDefinition();
     if (defDecl != nullptr)
-        methodInfo->defLocation = GetDeclLocation(defDecl, m_astContext);
+        methodInfo->defLocation = GetLocation(defDecl, m_astContext);
     
     
     for (const clang::ParmVarDecl* param: decl->parameters())
     {
         MethodParamInfo paramInfo;
         paramInfo.name = param->getNameAsString();
+        paramInfo.type = TypeInfo::Create(param->getType(), m_astContext);
+        methodInfo->params.push_back(std::move(paramInfo));
     }
     
     return methodInfo;
