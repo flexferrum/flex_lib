@@ -260,7 +260,7 @@ public:
         bool result = true;
         if (m_targetType->m_fullQualifiedName == "std::basic_string")
         {
-            const BuiltinType* charType = boost::get<TypeInfoPtr>(typeInfo.arguments[0])->getAsBuiltin(); 
+            const BuiltinType* charType = typeInfo.GetTypeArg(0)->getAsBuiltin(); 
             if (charType->type == BuiltinType::Char)
                 typeInfo.type = WellKnownType::StdString;
             else if (charType->type == BuiltinType::WChar)
@@ -280,8 +280,10 @@ public:
             typeInfo.type = WellKnownType::StdMap;
         else if (m_targetType->m_fullQualifiedName == "std::set")
             typeInfo.type = WellKnownType::StdSet;
-        else if (m_targetType->m_fullQualifiedName == "std::UnorderedMap")
+        else if (m_targetType->m_fullQualifiedName == "std::unordered_map")
             typeInfo.type = WellKnownType::StdUnorderedMap;
+        else if (m_targetType->m_fullQualifiedName == "std::unordered_set")
+            typeInfo.type = WellKnownType::StdUnorderedSet;
         else if (m_targetType->m_fullQualifiedName == "std::shared_ptr")
             typeInfo.type = WellKnownType::StdSharedPtr;
         else if (m_targetType->m_fullQualifiedName == "std::unique_ptr")

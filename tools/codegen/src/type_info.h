@@ -84,6 +84,12 @@ struct TemplateType
     std::vector<TplArg> arguments;
     TypeInfoPtr aliasedType;
     const clang::NamedDecl* decl;
+    
+    auto GetTypeArg(int idx) const
+    {
+        const TypeInfoPtr* result = boost::get<TypeInfoPtr>(&arguments[idx]);
+        return result ? *result : TypeInfoPtr();
+    }
 };
 
 struct WellKnownType : TemplateType
