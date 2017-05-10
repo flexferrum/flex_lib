@@ -27,16 +27,21 @@ auto GetLocation(const Entity* decl, const clang::ASTContext* context)
     return GetLocation(decl->getLocation(), context); 
 }
 
-template<typename Entity>
-std::string EntityToString(const Entity* decl, const clang::ASTContext* context)
+inline void SetupDefaultPrintingPolicy(clang::PrintingPolicy& policy)
 {
-    clang::PrintingPolicy policy(context->getLangOpts());
-    
     policy.Bool = true;
     policy.AnonymousTagLocations = false;
     policy.SuppressUnwrittenScope = true;
     policy.Indentation = 4;
     policy.UseVoidForZeroParams = false;
+}
+
+template<typename Entity>
+std::string EntityToString(const Entity* decl, const clang::ASTContext* context)
+{
+    clang::PrintingPolicy policy(context->getLangOpts());
+    
+    SetupDefaultPrintingPolicy(policy);
     
     std::string result;
     {

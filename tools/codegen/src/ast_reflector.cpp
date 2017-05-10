@@ -2,6 +2,8 @@
 #include "ast_utils.h"
 #include "type_info.h"
 
+#include <clang/AST/ASTContext.h>
+
 namespace reflection 
 {
 
@@ -39,13 +41,18 @@ AccessType ConvertAccessType(clang::AccessSpecifier access)
     return result;
 }
 
-EnumInfoPtr AstReflector::ReflectEnum(const clang::EnumDecl *decl, NamespacesTree &nsTree)
+EnumInfoPtr AstReflector::ReflectEnum(const clang::EnumDecl *decl, NamespacesTree* nsTree)
 {
     const DeclContext* nsContext = decl->getEnclosingNamespaceContext();
     
-    NamespaceInfoPtr ns = nsTree.GetNamespace(nsContext);
+    NamespaceInfoPtr ns;
+    EnumInfoPtr enumInfo;
+    if (nsTree != nullptr)
+    {
+        ns = nsTree->GetNamespace(nsContext);
+        enumInfo = FindExisting(ns->enums, decl->getQualifiedNameAsString());    
+    }
     
-    EnumInfoPtr enumInfo = FindExisting(ns->enums, decl->getQualifiedNameAsString());
     if (enumInfo)
         return enumInfo;
     
@@ -55,7 +62,7 @@ EnumInfoPtr AstReflector::ReflectEnum(const clang::EnumDecl *decl, NamespacesTre
     enumInfo->decl = decl;
     enumInfo->location = GetLocation(decl, m_astContext);
     
-    SetupNamedDeclInfo(decl, ns, enumInfo.get());
+    SetupNamedDeclInfo(decl, enumInfo.get(), m_astContext);
     
     enumInfo->isScoped = decl->isScoped();
     
@@ -73,20 +80,26 @@ EnumInfoPtr AstReflector::ReflectEnum(const clang::EnumDecl *decl, NamespacesTre
     return enumInfo;
 }
 
-ClassInfoPtr AstReflector::ReflectClass(const CXXRecordDecl* decl, NamespacesTree& nsTree)
+ClassInfoPtr AstReflector::ReflectClass(const CXXRecordDecl* decl, NamespacesTree* nsTree)
 {
     const DeclContext* nsContext = decl->getEnclosingNamespaceContext();
     
-    NamespaceInfoPtr ns = nsTree.GetNamespace(nsContext);
+    NamespaceInfoPtr ns;
+    ClassInfoPtr classInfo;
     
-    ClassInfoPtr classInfo = FindExisting(ns->classes, decl->getQualifiedNameAsString());
+    if (nsTree)
+    {
+        ns = nsTree->GetNamespace(nsContext);        
+        classInfo = FindExisting(ns->classes, decl->getQualifiedNameAsString());
+    }
+    
     if (classInfo)
         return classInfo;
     
     classInfo = std::make_shared<ClassInfo>();
     classInfo->decl = decl;
     
-    SetupNamedDeclInfo(decl, ns, classInfo.get());
+    SetupNamedDeclInfo(decl, classInfo.get(), m_astContext);
     classInfo->isAbstract = decl->isAbstract();
     classInfo->isTrivial = decl->isTrivial();
     classInfo->isUnion = decl->isUnion();
@@ -106,15 +119,19 @@ ClassInfoPtr AstReflector::ReflectClass(const CXXRecordDecl* decl, NamespacesTre
     return classInfo;    
 }
 
-MethodInfoPtr AstReflector::ReflectMethod(const CXXMethodDecl* decl, NamespacesTree& nsTree)
+MethodInfoPtr AstReflector::ReflectMethod(const CXXMethodDecl* decl, NamespacesTree* nsTree)
 {
     MethodInfoPtr methodInfo = std::make_shared<MethodInfo>();
 
     const DeclContext* nsContext = decl->getEnclosingNamespaceContext();
     
-    NamespaceInfoPtr ns = nsTree.GetNamespace(nsContext);
-
-    SetupNamedDeclInfo(decl, ns, methodInfo.get());
+    NamespaceInfoPtr ns;
+    if (nsTree)
+    {
+        ns = nsTree->GetNamespace(nsContext);
+        SetupNamedDeclInfo(decl, methodInfo.get(), m_astContext);
+    }
+    
     methodInfo->isCtor = llvm::dyn_cast_or_null<const clang::CXXConstructorDecl>(decl) != nullptr;
     methodInfo->isDtor = llvm::dyn_cast_or_null<const clang::CXXDestructorDecl>(decl) != nullptr;
     methodInfo->isOperator = decl->isOverloadedOperator();
@@ -147,13 +164,16 @@ MethodInfoPtr AstReflector::ReflectMethod(const CXXMethodDecl* decl, NamespacesT
     return methodInfo;
 }
 
-void AstReflector::SetupNamedDeclInfo(const NamedDecl* decl, NamespaceInfoPtr enclosingNamespace, NamedDeclInfo* info)
+void AstReflector::SetupNamedDeclInfo(const NamedDecl* decl, NamedDeclInfo* info, const clang::ASTContext* astContext)
 {
     info->name = decl->getNameAsString();
     
+    auto declContext = decl->getDeclContext();
+    const clang::NamespaceDecl* encNs = clang::NamespaceDecl::castFromDeclContext(declContext->isNamespace() ? declContext : declContext->getEnclosingNamespaceContext());
+    
     std::string scopeQualifier = "";
     
-    for (const DeclContext* parentCtx = decl->getDeclContext(); parentCtx != enclosingNamespace->decl; parentCtx = parentCtx->getParent())
+    for (const DeclContext* parentCtx = declContext; parentCtx != encNs; parentCtx = parentCtx->getParent())
     {
         const NamedDecl* namedScope = llvm::dyn_cast_or_null<const NamedDecl>(Decl::castFromDeclContext(parentCtx));
         if (namedScope == nullptr)
@@ -170,7 +190,16 @@ void AstReflector::SetupNamedDeclInfo(const NamedDecl* decl, NamespaceInfoPtr en
     }
     
     info->scopeSpecifier = scopeQualifier;
-    info->namespaceQualifier = enclosingNamespace->GetFullQualifiedName();    
+    
+    if (encNs != nullptr && !encNs->isTranslationUnit())
+    {
+        clang::PrintingPolicy policy(astContext->getLangOpts());
+        SetupDefaultPrintingPolicy(policy);
+
+        llvm::raw_string_ostream os(info->namespaceQualifier);
+        encNs->printQualifiedName(os, policy);
+    }
 }
+
 
 } // reflection

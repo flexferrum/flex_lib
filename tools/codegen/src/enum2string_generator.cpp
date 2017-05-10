@@ -33,7 +33,7 @@ void Enum2StringGenerator::HandleMatch(const clang::ast_matchers::MatchFinder::M
     {
         reflection::AstReflector reflector(matchResult.Context);
         
-        reflector.ReflectEnum(decl, m_namespaces);
+        reflector.ReflectEnum(decl, &m_namespaces);
     }    
 }
 

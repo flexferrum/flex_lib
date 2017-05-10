@@ -1,5 +1,6 @@
 #include "type_info.h"
 #include "ast_utils.h"
+#include "ast_reflector.h"
 #include "utils.h"
 
 #include <clang/AST/TypeVisitor.h>
@@ -26,93 +27,113 @@ public:
         {
         case clang::BuiltinType::Void:
             result.type = BuiltinType::Void;
+            m_targetType->m_declaredName = "void";
             break;
         case clang::BuiltinType::Bool:
             result.type = BuiltinType::Bool;
             result.bits = 1;
+            m_targetType->m_declaredName = "bool";
             break;
         case clang::BuiltinType::Char_U:
         case clang::BuiltinType::Char_S:
             result.type = BuiltinType::Char;
             result.bits = 8;
+            m_targetType->m_declaredName = "char";
             break;
         case clang::BuiltinType::WChar_U:
         case clang::BuiltinType::WChar_S:
             result.type = BuiltinType::Char;
             result.bits = 32;
+            m_targetType->m_declaredName = "wchar_t";
             break;
         case clang::BuiltinType::SChar:
             result.type = BuiltinType::Char;
             result.bits = 8;
             result.isSigned = BuiltinType::Signed;
+            m_targetType->m_declaredName = "signed char";
             break;
         case clang::BuiltinType::UChar:
             result.type = BuiltinType::Char;
             result.bits = 8;
             result.isSigned = BuiltinType::Unsigned;
+            m_targetType->m_declaredName = "unsigned char";
             break;
         case clang::BuiltinType::Char16:
             result.type = BuiltinType::Char;
             result.bits = 16;
+            m_targetType->m_declaredName = "char16_t";
             break;
         case clang::BuiltinType::Char32:
             result.type = BuiltinType::Char;
             result.bits = 32;
+            m_targetType->m_declaredName = "char32_t";
             break;
         case clang::BuiltinType::UShort:
             result.type = BuiltinType::Short;
             result.bits = 16;
             result.isSigned = BuiltinType::Unsigned;
+            m_targetType->m_declaredName = "unsigned short";
             break;
         case clang::BuiltinType::Short:
             result.type = BuiltinType::Short;
             result.bits = 16;
             result.isSigned = BuiltinType::Signed;
+            m_targetType->m_declaredName = "short";
             break;
         case clang::BuiltinType::UInt:
             result.type = BuiltinType::Int;
             result.bits = 32;
             result.isSigned = BuiltinType::Unsigned;
+            m_targetType->m_declaredName = "unsigned int";
             break;
         case clang::BuiltinType::Int:
             result.type = BuiltinType::Int;
             result.bits = 32;
             result.isSigned = BuiltinType::Signed;
+            m_targetType->m_declaredName = "int";
             break;
         case clang::BuiltinType::ULong:
             result.type = BuiltinType::Long;
             result.bits = 64;
             result.isSigned = BuiltinType::Unsigned;
+            m_targetType->m_declaredName = "unsigned long";
             break;
         case clang::BuiltinType::Long:
             result.type = BuiltinType::Long;
             result.bits = 64;
             result.isSigned = BuiltinType::Signed;
+            m_targetType->m_declaredName = "long";
             break;
         case clang::BuiltinType::ULongLong:
             result.type = BuiltinType::LongLong;
             result.bits = 64;
             result.isSigned = BuiltinType::Unsigned;
+            m_targetType->m_declaredName = "unsigned long long";
             break;
         case clang::BuiltinType::LongLong:
             result.type = BuiltinType::LongLong;
             result.bits = 64;
             result.isSigned = BuiltinType::Signed;
+            m_targetType->m_declaredName = "long long";
             break;
         case clang::BuiltinType::Float:
             result.type = BuiltinType::Float;
             result.bits = 32;
+            m_targetType->m_declaredName = "float";
             break;
         case clang::BuiltinType::Double:
             result.type = BuiltinType::Double;
             result.bits = 64;
+            m_targetType->m_declaredName = "double";
             break;
         case clang::BuiltinType::LongDouble:
             result.type = BuiltinType::LongDouble;
             result.bits = 80;
+            m_targetType->m_declaredName = "long double";
             break;
         case clang::BuiltinType::NullPtr:
             result.type = BuiltinType::Nullptr;
+            m_targetType->m_declaredName = "nullptr_t";
             break;
         default:
             result.type = BuiltinType::Extended;
@@ -121,6 +142,8 @@ public:
         result.typeInfo = tp;
         result.kind = tp->getKind();
         m_targetType->m_type = result;
+        m_targetType->m_scopedName = m_targetType->m_declaredName;
+        m_targetType->m_fullQualifiedName = m_targetType->m_declaredName;
         
         return true;
     }
@@ -222,8 +245,53 @@ public:
             result.arguments.push_back(argInfo);
         }
         
-        m_targetType->m_type = static_cast<TemplateType&&>(std::move(result));
+        bool isWellKnownType = DetectWellKnownType(result);
+        
+        if (isWellKnownType)
+            m_targetType->m_type = std::move(result);
+        else
+            m_targetType->m_type = static_cast<TemplateType&&>(std::move(result));
+        
         return true;
+    }
+    
+    bool DetectWellKnownType(WellKnownType& typeInfo)
+    {
+        bool result = true;
+        if (m_targetType->m_fullQualifiedName == "std::basic_string")
+        {
+            const BuiltinType* charType = boost::get<TypeInfoPtr>(typeInfo.arguments[0])->getAsBuiltin(); 
+            if (charType->type == BuiltinType::Char)
+                typeInfo.type = WellKnownType::StdString;
+            else if (charType->type == BuiltinType::WChar)
+                typeInfo.type = WellKnownType::StdWstring;
+            else
+                result = false;
+        }
+        else if (m_targetType->m_fullQualifiedName == "std::vector")
+            typeInfo.type = WellKnownType::StdVector;
+        else if (m_targetType->m_fullQualifiedName == "std::array")
+            typeInfo.type = WellKnownType::StdArray;
+        else if (m_targetType->m_fullQualifiedName == "std::list")
+            typeInfo.type = WellKnownType::StdList;
+        else if (m_targetType->m_fullQualifiedName == "std::deque")
+            typeInfo.type = WellKnownType::StdDeque;
+        else if (m_targetType->m_fullQualifiedName == "std::map")
+            typeInfo.type = WellKnownType::StdMap;
+        else if (m_targetType->m_fullQualifiedName == "std::set")
+            typeInfo.type = WellKnownType::StdSet;
+        else if (m_targetType->m_fullQualifiedName == "std::UnorderedMap")
+            typeInfo.type = WellKnownType::StdUnorderedMap;
+        else if (m_targetType->m_fullQualifiedName == "std::shared_ptr")
+            typeInfo.type = WellKnownType::StdSharedPtr;
+        else if (m_targetType->m_fullQualifiedName == "std::unique_ptr")
+            typeInfo.type = WellKnownType::StdUniquePtr;
+        else if (m_targetType->m_fullQualifiedName == "std::optional")
+            typeInfo.type = WellKnownType::StdOptional;
+        else
+            result = false;
+        
+        return result;
     }
     
     bool VisitEnumType(const clang::EnumType* tp)
@@ -262,7 +330,11 @@ public:
 private:
     void FillDeclDependentFields(const clang::NamedDecl* decl)
     {
-        ;
+        NamedDeclInfo declInfo;
+        AstReflector::SetupNamedDeclInfo(decl, &declInfo, m_astContext);
+        m_targetType->m_declaredName = declInfo.name;
+        m_targetType->m_scopedName = declInfo.scopeSpecifier.empty() ? declInfo.name : declInfo.scopeSpecifier + "::" + declInfo.name;
+        m_targetType->m_fullQualifiedName = declInfo.namespaceQualifier.empty() ? m_targetType->m_scopedName : declInfo.namespaceQualifier + "::" + m_targetType->m_scopedName;
     }
     
 private:
@@ -290,7 +362,7 @@ TypeInfoPtr TypeInfo::Create(const clang::QualType& qt, const clang::ASTContext*
         result->m_typeDecl->dump();
         std::clog << std::endl;
     }
-    std::clog << "### Unwrapped type: " << result << std::endl;
+    std::clog << "### Unwrapped type: " << result->getFullQualifiedName() << ", " << result << std::endl;
     
     return result;
 }

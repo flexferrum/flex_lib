@@ -98,7 +98,7 @@ struct WellKnownType : TemplateType
         StdDeque,
         StdMap,
         StdSet,
-        SetUnorderedMap,
+        StdUnorderedMap,
         StdUnorderedSet,
         StdSharedPtr,
         StdUniquePtr,
