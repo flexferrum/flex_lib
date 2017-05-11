@@ -48,8 +48,8 @@ inline IntegerValue ConvertAPInt(llvm::APInt intValue)
     return result;
 }
 
-template<typename Seq>
-void WriteSeq(std::ostream& os, Seq&& seq, std::string delim = ", ")
+template<typename Seq, typename Fn>
+void WriteSeq(std::ostream& os, Seq&& seq, std::string delim, Fn&& ftor)
 {
     bool isFirst = true;
     for (auto& i : seq)
@@ -59,8 +59,14 @@ void WriteSeq(std::ostream& os, Seq&& seq, std::string delim = ", ")
         else
             os << delim;
         
-        os << i;
+        ftor(os, i);
     }
+}
+
+template<typename Seq>
+void WriteSeq(std::ostream& os, Seq&& seq, std::string delim = ", ")
+{
+    WriteSeq(os, std::forward<Seq>(seq), std::move(delim), [](auto&& os, auto&& i) {os << i;});
 }
 
 #endif // UTILS_H

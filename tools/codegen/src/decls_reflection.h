@@ -47,6 +47,10 @@ struct NamedDeclInfo
         const char* prefix = includeGlobalScope || !fqScope.empty() ? "::" : "";
         return !name.empty() ? fqScope + prefix + name : "";
     }
+    std::string GetScopedName() const
+    {
+        return scopeSpecifier.empty() ? name : scopeSpecifier + "::" + name;
+    }
 };
 
 struct SourceLocation

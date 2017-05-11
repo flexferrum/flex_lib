@@ -75,7 +75,8 @@ EnumInfoPtr AstReflector::ReflectEnum(const clang::EnumDecl *decl, NamespacesTre
         enumInfo->items.push_back(std::move(item));
     }
 
-    ns->enums.push_back(enumInfo);
+    if (ns)
+        ns->enums.push_back(enumInfo);
 
     return enumInfo;
 }
@@ -115,6 +116,9 @@ ClassInfoPtr AstReflector::ReflectClass(const CXXRecordDecl* decl, NamespacesTre
     {
         ;
     }
+    
+    if (ns)
+        ns->classes.push_back(classInfo);
 
     return classInfo;    
 }
@@ -132,12 +136,26 @@ MethodInfoPtr AstReflector::ReflectMethod(const CXXMethodDecl* decl, NamespacesT
         SetupNamedDeclInfo(decl, methodInfo.get(), m_astContext);
     }
     
+    QualType fnQualType = decl->getType();
+    
+    while (const ParenType *parenType = llvm::dyn_cast<ParenType>(fnQualType)) 
+        fnQualType = parenType->getInnerType();
+    
+    const FunctionProtoType* fnProtoType = nullptr;
+    if (const FunctionType *fnType = fnQualType->getAs<FunctionType>())
+    {
+        if (decl->hasWrittenPrototype())
+            fnProtoType = llvm::dyn_cast<FunctionProtoType>(fnType);
+    }
+    
     methodInfo->isCtor = llvm::dyn_cast_or_null<const clang::CXXConstructorDecl>(decl) != nullptr;
     methodInfo->isDtor = llvm::dyn_cast_or_null<const clang::CXXDestructorDecl>(decl) != nullptr;
     methodInfo->isOperator = decl->isOverloadedOperator();
     methodInfo->isDeleted = decl->isDeleted();
     methodInfo->isConst = decl->isConst();
     methodInfo->isImplicit = decl->isImplicit();
+    if (fnProtoType)
+        methodInfo->isNoExcept = isNoexceptExceptionSpec(fnProtoType->getExceptionSpecType());
     // methodInfo->isNoExcept = decl->is
     methodInfo->isPure = decl->isPure();
     methodInfo->isStatic = decl->isStatic();
@@ -150,14 +168,14 @@ MethodInfoPtr AstReflector::ReflectMethod(const CXXMethodDecl* decl, NamespacesT
     methodInfo->declLocation = GetLocation(decl, m_astContext);
     auto defDecl = decl->getDefinition();
     if (defDecl != nullptr)
-        methodInfo->defLocation = GetLocation(defDecl, m_astContext);
-    
+        methodInfo->defLocation = GetLocation(defDecl, m_astContext);    
     
     for (const clang::ParmVarDecl* param: decl->parameters())
     {
         MethodParamInfo paramInfo;
         paramInfo.name = param->getNameAsString();
         paramInfo.type = TypeInfo::Create(param->getType(), m_astContext);
+        paramInfo.fullDecl = EntityToString(param, m_astContext);
         methodInfo->params.push_back(std::move(paramInfo));
     }
     

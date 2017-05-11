@@ -204,6 +204,50 @@ public:
     {
         return m_typeDecl;
     }
+    bool canBeMoved() const
+    {
+        struct Visitor : public boost::static_visitor<bool>
+        {
+            Visitor(const TypeInfo* ti) : m_type(ti) {}
+            
+            bool operator() (const NoType&) const {return false;}
+            bool operator() (const BuiltinType&) const {return false;}
+            bool operator() (const ArrayType&) const {return false;}
+            bool operator() (const EnumType&) const {return false;}
+            
+            bool operator() (const RecordType&) const
+            {
+                if (m_type->m_isRVReference)
+                    return true;
+                
+                if (m_type->m_isConst)
+                    return false;
+                
+                if (m_type->m_pointingLevels != 0)
+                    return false;
+                // clang::CXXRecordDecl
+                return true;
+            }
+            
+            bool operator() (const TemplateType&) const
+            {
+                if (m_type->m_isRVReference)
+                    return true;
+                
+                if (m_type->m_isConst || m_type->m_isReference)
+                    return false;
+                
+                if (m_type->m_pointingLevels != 0)
+                    return false;
+                // clang::CXXRecordDecl
+                return true;
+            }
+            
+            const TypeInfo* m_type;
+        };
+        
+        return boost::apply_visitor(Visitor(this), m_type);
+    }
     
     static TypeInfoPtr Create(const clang::QualType& qt, const clang::ASTContext* astContext);
     

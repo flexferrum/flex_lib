@@ -27,6 +27,11 @@ protected:
     void WriteSourcePostamble(CppSourceStream &srcOs) override;
     
 private:
+    void WritePimplImplementation(CppSourceStream& os, reflection::ClassInfoPtr classInfo);
+    void WriteCtorImplementation(CppSourceStream& os, reflection::ClassInfoPtr classInfo, reflection::MethodInfoPtr methodInfo);
+    void WriteMethodImplementation(CppSourceStream& os, reflection::ClassInfoPtr classInfo, reflection::MethodInfoPtr methodInfo);
+    
+private:
     reflection::NamespacesTree m_namespaces;
 };
 } // codegen

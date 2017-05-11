@@ -1,6 +1,8 @@
 #include "pimpl_generator.h"
 #include "options.h"
 #include "ast_reflector.h"
+#include "ast_utils.h"
+#include "utils.h"
 
 #include <clang/ASTMatchers/ASTMatchers.h>
 
@@ -37,22 +39,6 @@ void PimplGenerator::HandleMatch(const clang::ast_matchers::MatchFinder::MatchRe
         auto ci = reflector.ReflectClass(decl, &m_namespaces);
         
         std::cout << "### Pimpl declaration found: " << ci->GetFullQualifiedName(false) << std::endl;
-        std::cout << "Methods: " << std::endl;
-        
-        for (auto mi : ci->methods)
-        {
-            std::cout << mi->fullPrototype << std::endl;
-            std::cout << "Return type: " << mi->returnType->getPrintedName() << std::endl;
-            std::cout << "Params: ";
-            for (auto& pi : mi->params)
-            {
-                std::cout << pi.type->getPrintedName() << ", ";
-            }
-            std::cout << std::endl;
-        }
-        // reflection::AstReflector reflector;
-        
-        // reflector.ReflectEnum(decl, m_namespaces, matchResult.Context);
     }        
 }
 
@@ -63,17 +49,106 @@ bool PimplGenerator::Validate()
 
 void PimplGenerator::WriteHeaderPreamble(CppSourceStream &hdrOs)
 {
+    hdrOs << out::header_guard(m_options.outputHeaderName) << "\n";
     
-}
-
-void PimplGenerator::WriteHeaderContent(CppSourceStream &hdrOs)
-{
+    // Include input files (directly, by path)
+    for (auto fileName : m_options.inputFiles)
+    {
+        std::replace(fileName.begin(), fileName.end(), '\\', '/');
+        hdrOs << "#include \"" << fileName << "\"\n";
+    }
     
+    // Necessary library files
+    hdrOs << "#include <utility>\n\n";
 }
 
 void PimplGenerator::WriteHeaderPostamble(CppSourceStream &hdrOs)
 {
+    hdrOs << out::scope_exit;    
+}
+
+void PimplGenerator::WriteHeaderContent(CppSourceStream &hdrOs)
+{
+    WriteNamespaceContents(hdrOs, m_namespaces.GetRootNamespace(), [this](CppSourceStream &os, reflection::NamespaceInfoPtr ns) {
+        for (auto& classInfo : ns->classes)
+        {
+            WritePimplImplementation(os, classInfo);
+        }      
+    });    
+}
+
+void PimplGenerator::WritePimplImplementation(CppSourceStream& os, reflection::ClassInfoPtr classInfo)
+{
+    for (reflection::MethodInfoPtr methodInfo : classInfo->methods)
+    {
+        if (methodInfo->isCtor)
+            WriteCtorImplementation(os, classInfo, methodInfo);
+        else if (methodInfo->isDtor)
+        {
+            if (methodInfo->isNoExcept)
+                os << methodInfo->GetScopedName() << "() noexcept = default;\n\n";
+            else
+                os << methodInfo->GetScopedName() << "() = default;\n\n";
+        }
+        else
+            WriteMethodImplementation(os, classInfo, methodInfo);
+    }
+}
+
+void PimplGenerator::WriteCtorImplementation(CppSourceStream& os, reflection::ClassInfoPtr classInfo, reflection::MethodInfoPtr methodInfo)
+{
+    if (methodInfo->isImplicit)
+        return;
     
+    os << methodInfo->GetScopedName() << "(";
+    WriteSeq(os, methodInfo->params, ", ", [](auto&& os, const reflection::MethodParamInfo& param) {os << param.fullDecl;});
+    os << ")";
+    if (methodInfo->isNoExcept)
+        os << " noexcept";
+    os << out::new_line(+1) << ": pimpl(";
+    WriteSeq(os, methodInfo->params, ", ", [](auto&& os, const reflection::MethodParamInfo& param) 
+    {
+        reflection::TypeInfoPtr pType = param.type;
+        
+        if (pType->canBeMoved())
+            os << "std::move(" << param.name << ")";
+        else
+            os << param.name;
+    });
+    os << ")";
+    os << out::new_line << "{";
+    os << out::new_line << "}\n\n";
+}
+
+void PimplGenerator::WriteMethodImplementation(CppSourceStream& os, reflection::ClassInfoPtr classInfo, reflection::MethodInfoPtr methodInfo)
+{
+    if (methodInfo->isImplicit)
+        return;
+    
+    os << methodInfo->returnType->getPrintedName() << " " << methodInfo->GetScopedName() << "(";
+    WriteSeq(os, methodInfo->params, ", ", [](auto&& os, const reflection::MethodParamInfo& param) {os << param.fullDecl;});
+    os << ")";
+    if (methodInfo->isConst)
+        os << " const";
+    if (methodInfo->isNoExcept)
+        os << " noexcept";
+    out::BracedStreamScope body("", "\n\n");
+    os << body;
+    os << out::new_line;
+    const reflection::BuiltinType* retType = methodInfo->returnType->getAsBuiltin();
+    if (retType == nullptr || retType->type != reflection::BuiltinType::Void)
+        os << "return ";
+    os << "m_impl->" << methodInfo->name << "(";
+    WriteSeq(os, methodInfo->params, ", ", [](auto&& os, const reflection::MethodParamInfo& param) 
+    {
+        reflection::TypeInfoPtr pType = param.type;
+        
+        if (pType->canBeMoved())
+            os << "std::move(" << param.name << ")";
+        else
+            os << param.name;
+    });
+    os << ");";
 }
 
 void PimplGenerator::WriteSourcePreamble(CppSourceStream &srcOs)

@@ -1,6 +1,7 @@
 #include "enum2string_generator.h"
 #include "options.h"
 #include "ast_reflector.h"
+#include "ast_utils.h"
 
 #include <clang/ASTMatchers/ASTMatchers.h>
 
@@ -57,18 +58,6 @@ void Enum2StringGenerator::WriteHeaderPreamble(CppSourceStream &hdrOs)
 void Enum2StringGenerator::WriteHeaderPostamble(CppSourceStream &hdrOs)
 {
     hdrOs << out::scope_exit;
-}
-
-template<typename Fn>
-void WriteNamespaceContents(CppSourceStream &hdrOs, reflection::NamespaceInfoPtr ns, Fn&& fn)
-{
-    out::BracedStreamScope nsScope("namespace " + ns->name, "", 0);
-    if (!ns->isRootNamespace)
-        hdrOs << out::new_line << nsScope;
-    
-    fn(hdrOs, ns);
-    for (auto& inner : ns->innerNamespaces)
-        WriteNamespaceContents(hdrOs, inner, std::forward<Fn>(fn));
 }
 
 void Enum2StringGenerator::WriteHeaderContent(CppSourceStream &hdrOs)

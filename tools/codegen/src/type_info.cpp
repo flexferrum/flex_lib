@@ -323,8 +323,8 @@ public:
     
     bool VisitQualType(const clang::QualType& qt)
     {
-        m_targetType->m_isConst = qt.isConstQualified();
-        m_targetType->m_isVolatile = qt.isVolatileQualified();
+        m_targetType->m_isConst |= qt.isConstQualified();
+        m_targetType->m_isVolatile |= qt.isVolatileQualified();
 
         return Visit(qt.getTypePtr());        
     }

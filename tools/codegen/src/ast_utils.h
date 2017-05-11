@@ -2,6 +2,7 @@
 #define AST_UTILS_H
 
 #include "decls_reflection.h"
+#include "cpp_source_stream.h"
 
 #include <clang/Basic/SourceManager.h>
 #include <clang/AST/PrettyPrinter.h>
@@ -34,6 +35,7 @@ inline void SetupDefaultPrintingPolicy(clang::PrintingPolicy& policy)
     policy.SuppressUnwrittenScope = true;
     policy.Indentation = 4;
     policy.UseVoidForZeroParams = false;
+    policy.SuppressInitializers = true;
 }
 
 template<typename Entity>
@@ -50,6 +52,21 @@ std::string EntityToString(const Entity* decl, const clang::ASTContext* context)
         decl->print(os, policy);
     }
     return result;
+}
+
+
+template<typename Fn>
+void WriteNamespaceContents(codegen::CppSourceStream &hdrOs, reflection::NamespaceInfoPtr ns, Fn&& fn)
+{
+    using namespace codegen;
+    
+    out::BracedStreamScope nsScope("namespace " + ns->name, "", 0);
+    if (!ns->isRootNamespace)
+        hdrOs << out::new_line << nsScope;
+    
+    fn(hdrOs, ns);
+    for (auto& inner : ns->innerNamespaces)
+        WriteNamespaceContents(hdrOs, inner, std::forward<Fn>(fn));
 }
 
 } // reflection
