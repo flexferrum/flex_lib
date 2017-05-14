@@ -1,68 +1,12 @@
 #include <gtest/gtest.h>
+#include <flex_lib/detector.h>
 
 #include "test_pimpl.h"
 
 #include <array>
 #include <iterator>
 
-class TestPimplImpl
-{
-public:
-    TestPimplImpl(uint32_t number)
-        : m_intNumber(number)
-    {        
-    }
-
-    TestPimplImpl(std::string number)
-        : m_strNumber(number)
-    {
-    }
-    
-    TestPimplImpl(TestMoveable&& moveable)
-        : m_moveableObj(std::move(moveable))
-    {
-    }
-    
-    const std::string GetString() const
-    {
-        return m_strNumber;
-    }
-    const uint32_t GetNumber() const
-    {
-        return m_intNumber;
-    }
-    void SetGeneratedValues(unsigned values[10])
-    {
-        std::copy(values, values + 10, begin(m_values));
-    }
-    const std::array<unsigned, 10> GetGeneratedValues() const
-    {
-        return m_values;
-    }
-    void ResetValues(int num, std::string str)
-    {
-        m_intNumber = num;
-        m_strNumber = str;
-    }
-
-    PimplMode GetCurrentMode() const
-    {
-        return m_curMode;
-    }
-    const int* GetMoveablePtr() const
-    {
-        return m_moveableObj.GetObject();
-    }
-    
-private:
-    uint32_t m_intNumber;
-    std::string m_strNumber;
-    std::array<unsigned, 10> m_values;
-    PimplMode m_curMode = AbnormalMode;
-    TestMoveable m_moveableObj = TestMoveable(5);
-};
-
-#include <generated/pimpl_gen.h>
+// #include <generated/pimpl_gen.h>
 
 TEST(PimplGen, StrConstructor_Successfull)
 {

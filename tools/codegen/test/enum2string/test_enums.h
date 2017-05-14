@@ -14,7 +14,6 @@ enum class Enum2
     Item2,
     Item1
 };
-
 namespace
 {
 enum TestAnonEnum1

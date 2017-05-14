@@ -10,6 +10,9 @@ namespace flex_lib {
 namespace detail {
 
 template<typename VT, typename Gen>
+auto MakeLazyListBuilder(Gen &&gen);
+
+template<typename VT, typename Gen>
 class LazyListBuilder
 {
 public:

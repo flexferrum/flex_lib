@@ -81,4 +81,14 @@ bool BasicGenerator::GenerateOutput()
     }
 #endif
 }
+
+void BasicGenerator::WriteExtraHeaders(CppSourceStream& os)
+{
+    for (auto& h : m_options.extraHeaders)
+    {
+        os << "#include ";
+        bool quoted = h[0] != '<';
+        os << (quoted ? "\"" : "") << h << (quoted ? "\"" : "") << "\n";
+    }
+}
 } // codegen

@@ -3,6 +3,7 @@
 #include "type_info.h"
 
 #include <clang/AST/ASTContext.h>
+#include <boost/algorithm/string/replace.hpp>
 
 namespace reflection 
 {
@@ -187,15 +188,22 @@ void AstReflector::SetupNamedDeclInfo(const NamedDecl* decl, NamedDeclInfo* info
     info->name = decl->getNameAsString();
     
     auto declContext = decl->getDeclContext();
-    const clang::NamespaceDecl* encNs = clang::NamespaceDecl::castFromDeclContext(declContext->isNamespace() ? declContext : declContext->getEnclosingNamespaceContext());
+    const clang::NamespaceDecl* encNs = nullptr; // = clang::NamespaceDecl::castFromDeclContext(declContext->isNamespace() ? declContext : declContext->getEnclosingNamespaceContext());
+    // auto encNsCtx = clang::NamespaceDecl::castToDeclContext(encNs);
     
     std::string scopeQualifier = "";
     
-    for (const DeclContext* parentCtx = declContext; parentCtx != encNs; parentCtx = parentCtx->getParent())
+    for (const DeclContext* parentCtx = declContext; parentCtx != nullptr; parentCtx = parentCtx->getParent())
     {
         const NamedDecl* namedScope = llvm::dyn_cast_or_null<const NamedDecl>(Decl::castFromDeclContext(parentCtx));
         if (namedScope == nullptr)
             continue;
+        
+        if (parentCtx->isNamespace())
+        {
+            encNs = clang::NamespaceDecl::castFromDeclContext(parentCtx);
+            break;
+        }
         
         auto scopeName = namedScope->getNameAsString();
         if (scopeName.empty())
@@ -217,6 +225,10 @@ void AstReflector::SetupNamedDeclInfo(const NamedDecl* decl, NamedDeclInfo* info
         llvm::raw_string_ostream os(info->namespaceQualifier);
         encNs->printQualifiedName(os, policy);
     }
+    
+    boost::algorithm::replace_all(info->namespaceQualifier, "(anonymous)::", "");
+    boost::algorithm::replace_all(info->namespaceQualifier, "::(anonymous)", "");
+    boost::algorithm::replace_all(info->namespaceQualifier, "(anonymous)", "");
 }
 
 

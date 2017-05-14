@@ -168,10 +168,20 @@ public:
     {
         m_stream->SetParams(m_paramsPtr);
     }
+    ScopedParams(ScopedParams&& params)
+        : m_stream(params.m_stream)
+        , m_params(std::move(params.m_params))
+        , m_paramsPtr(&m_params)
+    {
+        params.m_stream = nullptr;
+        params.m_paramsPtr = nullptr;
+    }
+    ScopedParams(const ScopedParams&) = delete;
     
     ~ScopedParams()
     {
-        m_stream->ResetParams(m_paramsPtr);
+        if (m_stream != nullptr)
+            m_stream->ResetParams(m_paramsPtr);
     }
     
     OutParams& GetParams()

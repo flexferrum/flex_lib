@@ -16,7 +16,7 @@ class lazy_list_iterator;
 template<typename NT> class lazy_list
 {
 public:
-    typedef typename LazyListConstructorBase<NT> ListConstructor;
+    typedef LazyListConstructorBase<NT> ListConstructor;
     typedef std::shared_ptr<ListConstructor> ListConstructorPtr;
 
 private:

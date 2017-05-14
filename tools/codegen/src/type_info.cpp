@@ -364,7 +364,7 @@ TypeInfoPtr TypeInfo::Create(const clang::QualType& qt, const clang::ASTContext*
         result->m_typeDecl->dump();
         std::clog << std::endl;
     }
-    std::clog << "### Unwrapped type: " << result->getFullQualifiedName() << ", " << result << std::endl;
+    // std::clog << "### Unwrapped type: " << result->getFullQualifiedName() << ", " << result << std::endl;
     
     return result;
 }

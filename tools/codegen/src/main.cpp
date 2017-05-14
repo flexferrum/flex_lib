@@ -2,6 +2,7 @@
 #include <clang/Tooling/CommonOptionsParser.h>
 #include <clang/ASTMatchers/ASTMatchers.h>
 #include <clang/ASTMatchers/ASTMatchFinder.h>
+#include <clang/Basic/Diagnostic.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/JamCRC.h>
 #include <llvm/Support/Path.h>
@@ -35,14 +36,16 @@ cl::opt<codegen::GeneratorId> GenerationMode(cl::desc("Choose generation mode:")
 cl::opt<std::string> OutputHeaderName("ohdr", cl::desc("Specify output header filename"), cl::value_desc("filename"), cl::cat(CodeGenCategory));
 cl::opt<std::string> OutputSourceName("osrc", cl::desc("Specify output source filename"), cl::value_desc("filename"), cl::cat(CodeGenCategory));
 cl::opt<std::string> FileToUpdateName("update", cl::desc("Specify source filename for code update"), cl::value_desc("filename"), cl::cat(CodeGenCategory));
+cl::opt<bool> ShowClangErrors("show-clang-diag", cl::desc("Show clang diagnostic during file processing"), cl::value_desc("flag"), cl::init(false), cl::cat(CodeGenCategory));
+cl::list<std::string> ExtraHeaders("eh", cl::desc("Specify extra header files for include into generation result"), cl::value_desc("filename"), cl::ZeroOrMore, cl::cat(CodeGenCategory));
 
 cl::opt<codegen::Standard> LangStandart("std", cl::desc("Choose the standard conformance for the generation results:"),
   cl::values(
         clEnumValN(codegen::Standard::Auto, "auto" , "Automatic detection (default)"),
         clEnumValN(codegen::Standard::Cpp03, "c++03" , "C++ 2003 standard"),
         clEnumValN(codegen::Standard::Cpp11, "c++11" , "C++ 2011 standard"),
-        clEnumValN(codegen::Standard::Cpp03, "c++14" , "C++ 2014 standard"),
-        clEnumValN(codegen::Standard::Cpp03, "c++17" , "C++ 2017 standard")
+        clEnumValN(codegen::Standard::Cpp14, "c++14" , "C++ 2014 standard"),
+        clEnumValN(codegen::Standard::Cpp17, "c++17" , "C++ 2017 standard")
     ), cl::Optional, cl::init(codegen::Standard::Auto), cl::cat(CodeGenCategory));
 
 // Define common help message printer
@@ -97,6 +100,8 @@ int main(int argc, const char** argv)
     using namespace clang::tooling;
     using namespace clang::ast_matchers;
     
+    clang::IgnoringDiagConsumer diagConsumer;
+
     // Parse command line options and setup ClangTool
     CommonOptionsParser optionsParser(argc, argv, CodeGenCategory);
     ClangTool tool(optionsParser.getCompilations(), optionsParser.getSourcePathList());
@@ -107,6 +112,10 @@ int main(int argc, const char** argv)
     options.outputHeaderName = OutputHeaderName;
     options.outputSourceName = OutputSourceName;
     options.targetStandard = LangStandart;
+    options.extraHeaders = ExtraHeaders;
+    
+    if (!ShowClangErrors)
+        tool.setDiagnosticConsumer(&diagConsumer);
     
     auto genFactory = std::find_if(begin(GenFactories), end(GenFactories), [type = options.generatorType](auto& p) {return p.first == type && p.second != nullptr;});
     
@@ -130,9 +139,9 @@ int main(int argc, const char** argv)
     
     
     // Run tool for the specified input files
-    auto result = tool.run(newFrontendActionFactory(&finder).get());
-    if (result == 0 && handler.HasErrors())
+    tool.run(newFrontendActionFactory(&finder).get());
+    if (handler.HasErrors())
         return -1;
     
-    return result;
+    return 0;
 }

@@ -26,6 +26,8 @@ protected:
     virtual void WriteSourcePreamble(CppSourceStream& srcOs) {}
     virtual void WriteSourceContent(CppSourceStream& srcOs) {}
     virtual void WriteSourcePostamble(CppSourceStream& srcOs) {}
+    
+    void WriteExtraHeaders(CppSourceStream& os);
 };
 
 } // codegen

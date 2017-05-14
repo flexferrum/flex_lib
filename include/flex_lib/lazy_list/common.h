@@ -125,4 +125,6 @@ struct lazy_list_constructor<VT, true>
 #endif
 }
 
+namespace fl = flex_lib;
+
 #endif // FLEX_LIB_LAZY_LIST_COMMON_H

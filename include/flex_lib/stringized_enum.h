@@ -37,6 +37,13 @@ bool String2Enum(const char* itemName, std::pair<const char*, EnumType> (&items)
     return true;    
 }
 } // detail
+
+template<typename E>
+const char* Enum2String(E e);
+
+template<typename E>
+E String2Enum(const char* name);
+
 } // flex_lib
 
 #endif // FLEX_LIB_STRINGIZED_ENUM_H__

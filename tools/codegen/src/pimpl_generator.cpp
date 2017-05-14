@@ -58,6 +58,8 @@ void PimplGenerator::WriteHeaderPreamble(CppSourceStream &hdrOs)
         hdrOs << "#include \"" << fileName << "\"\n";
     }
     
+    WriteExtraHeaders(hdrOs);
+
     // Necessary library files
     hdrOs << "#include <utility>\n\n";
 }
@@ -85,10 +87,11 @@ void PimplGenerator::WritePimplImplementation(CppSourceStream& os, reflection::C
             WriteCtorImplementation(os, classInfo, methodInfo);
         else if (methodInfo->isDtor)
         {
+            os << out::new_line;
             if (methodInfo->isNoExcept)
-                os << methodInfo->GetScopedName() << "() noexcept = default;\n\n";
+                os << methodInfo->GetScopedName() << "() noexcept = default;\n";
             else
-                os << methodInfo->GetScopedName() << "() = default;\n\n";
+                os << methodInfo->GetScopedName() << "() = default;\n";
         }
         else
             WriteMethodImplementation(os, classInfo, methodInfo);
@@ -100,14 +103,20 @@ void PimplGenerator::WriteCtorImplementation(CppSourceStream& os, reflection::Cl
     if (methodInfo->isImplicit)
         return;
     
-    os << methodInfo->GetScopedName() << "(";
+    os << out::new_line << methodInfo->GetScopedName() << "(";
     WriteSeq(os, methodInfo->params, ", ", [](auto&& os, const reflection::MethodParamInfo& param) {os << param.fullDecl;});
     os << ")";
     if (methodInfo->isNoExcept)
         os << " noexcept";
-    os << out::new_line(+1) << ": pimpl(";
-    WriteSeq(os, methodInfo->params, ", ", [](auto&& os, const reflection::MethodParamInfo& param) 
+    os << out::new_line(+1) << ": pimpl(this";
+    bool isFirst = true;
+    WriteSeq(os, methodInfo->params, ", ", [&isFirst](auto&& os, const reflection::MethodParamInfo& param) 
     {
+        if (isFirst)
+        {
+            isFirst = false;
+            os << ", ";
+        }
         reflection::TypeInfoPtr pType = param.type;
         
         if (pType->canBeMoved())
@@ -117,36 +126,41 @@ void PimplGenerator::WriteCtorImplementation(CppSourceStream& os, reflection::Cl
     });
     os << ")";
     os << out::new_line << "{";
-    os << out::new_line << "}\n\n";
+    os << out::new_line << "}\n";
 }
 
 void PimplGenerator::WriteMethodImplementation(CppSourceStream& os, reflection::ClassInfoPtr classInfo, reflection::MethodInfoPtr methodInfo)
 {
-    if (methodInfo->isImplicit)
+    if (methodInfo->isImplicit || methodInfo->isStatic)
         return;
     
-    os << methodInfo->returnType->getPrintedName() << " " << methodInfo->GetScopedName() << "(";
+    os << out::new_line << methodInfo->returnType->getPrintedName() << " " << methodInfo->GetScopedName() << "(";
     WriteSeq(os, methodInfo->params, ", ", [](auto&& os, const reflection::MethodParamInfo& param) {os << param.fullDecl;});
     os << ")";
     if (methodInfo->isConst)
         os << " const";
     if (methodInfo->isNoExcept)
         os << " noexcept";
-    out::BracedStreamScope body("", "\n\n");
+    out::BracedStreamScope body("", "\n");
     os << body;
     os << out::new_line;
     const reflection::BuiltinType* retType = methodInfo->returnType->getAsBuiltin();
     if (retType == nullptr || retType->type != reflection::BuiltinType::Void)
         os << "return ";
     os << "m_impl->" << methodInfo->name << "(";
-    WriteSeq(os, methodInfo->params, ", ", [](auto&& os, const reflection::MethodParamInfo& param) 
+    WriteSeq(os, methodInfo->params, ", ", [classInfo](auto&& os, const reflection::MethodParamInfo& param) 
     {
+        std::string paramName = param.name;
+        
         reflection::TypeInfoPtr pType = param.type;
+        const reflection::RecordType* rType = pType->getAsRecord();
+        if (rType && rType->decl == classInfo->decl)
+            paramName = "*" + param.name + (pType->getPointingLevels() != 0 ? "->" : ".") + "m_impl.get()";
         
         if (pType->canBeMoved())
-            os << "std::move(" << param.name << ")";
+            os << "std::move(" << paramName << ")";
         else
-            os << param.name;
+            os << paramName;
     });
     os << ");";
 }

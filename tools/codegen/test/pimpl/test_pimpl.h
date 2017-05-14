@@ -43,6 +43,8 @@ public:
     void ResetValues(int num, std::string str);
     PimplMode GetCurrentMode() const;
     const int* GetMoveablePtr() const noexcept;
+    
+    bool operator == (const TestPimpl& other) const;
 };
 
 #endif // TEST_ENUMS_H
